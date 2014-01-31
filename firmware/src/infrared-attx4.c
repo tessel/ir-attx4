@@ -25,6 +25,7 @@ void configureReceiveTimerInterrupt(void);
 void enableReceiveTimerInterrupt(uint8_t enable);
 void enableReceive(uint8_t enable);
 
+// Transmit functionality
 void resetTransmitTimerRegisters(void);
 void delayMicroseconds(uint32_t us);
 void enablePWM(uint8_t enable);

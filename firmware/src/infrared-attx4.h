@@ -53,7 +53,6 @@
 #define STATE_RX_SPACE	4
 #define STATE_RX_STOP	5
 #define STATE_TX		6
-#define STATE_TX_RX_WAITING	7
 
 // Struct for keeping tracking of the receive state
 typedef struct {
@@ -65,7 +64,7 @@ typedef struct {
 } 
 receiver_t;
 
-// Struct for keeping tracking of the receive state
+// Struct for keeping tracking of the transmit state
 typedef struct {
   uint8_t frequency;          	// frequency for transmission
   uint8_t state;          		// state machine
