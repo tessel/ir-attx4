@@ -17,7 +17,7 @@ var MAX_SIGNAL_DURATION = 200;
 
 var Infrared = function(hardware, callback) {
 
-    this.spi = hardware.SPI({clockSpeed : 20000});
+    this.spi = hardware.SPI({clockSpeed : 1000});
     this.chipSelect = hardware.gpio(1);
     this.reset = hardware.gpio(2);
     this.irq = hardware.gpio(3);
@@ -282,10 +282,19 @@ Infrared.prototype.validateResponse = function(values, expected, callback) {
 
 Infrared.prototype.SPITransfer = function(data, callback) {
     
+    // Pull Chip select down prior to transfer
     this.chipSelect.low();
+
+    // Send over the data
     var ret = this.spi.transferSync(data);
+
+    // Pull chip select back up
+    this.chipSelect.high();
+
+    // Call any callbacks
     callback && callback(ret);
 
+    // Return the data
     return ret;
 }
 
