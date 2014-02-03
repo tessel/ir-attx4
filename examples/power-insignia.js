@@ -14,7 +14,7 @@ infrared.on('connected', function(err) {
 		// Start turning tv on and off every 3 seconds
 		setInterval(powerTV, 3000);
 	}
-})
+});
 
 // If we get data, print it out
 infrared.on('data', function(data) {
@@ -32,5 +32,5 @@ var powerTV = function() {
 		else {
 			console.log("TV Should be powered...");
 		}
-	})
+	});
 }
