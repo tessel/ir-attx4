@@ -6,6 +6,8 @@ var hardware = tessel.port('a');
 // Import library and connect to module
 var infrared = require('../index').connect(hardware);
 
+var counter = 0;
+
 // When we're connected
 infrared.on('connected', function(err) {
 	if (!err) {
@@ -13,6 +15,9 @@ infrared.on('connected', function(err) {
 
 		// Start turning tv on and off every 3 seconds
 		setInterval(powerTV, 3000);
+	}
+	else {
+		console.log("Err initializing: ", err.message	);
 	}
 });
 

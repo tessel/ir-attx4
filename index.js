@@ -191,7 +191,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
             }
 
             else if (!self.validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
-                err = new Error("Invalid response from raw signal packet...");
+                err = new Error("Invalid response from raw signal packet: ", response);
             }
 
             setImmediate(function() {
@@ -269,6 +269,7 @@ Infrared.prototype.validateResponse = function(values, expected, callback) {
     // TODO: Replace with the 'every' method
     expected.forEach(function(element, index) {
         if (element != values[index]) {
+            console.log(values[index], "was expected to equal", element);
             res = false;
         }
     });
@@ -290,7 +291,7 @@ Infrared.prototype.SPITransfer = function(data, callback) {
 
     // Pull chip select back up
     this.chipSelect.high();
-
+    console.log("Received: ", ret);
     // Call any callbacks
     callback && callback(ret);
 
