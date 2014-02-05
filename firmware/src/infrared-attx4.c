@@ -86,17 +86,8 @@ void initializeIR(void) {
   // Stop interrupts as we setup
   cli();
 
-  // Clear the watchdog timer if it reset the device
-  if(MCUSR & (1 << WDRF)){            // If a reset was caused by the Watchdog Timer...
-    cbi(MCUSR, WDRF); // Clear the WDT reset flag
-    WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit (these have to be set in the same operation)
-    WDTCSR = 0x00;                      // Disable the WDT
-  }
-  // Set up Watch Dog Timer for Inactivity
-  WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit
-  WDTCSR =   _BV(WDIE);// |              // Enable WDT Interrupt
-             //_BV(WDP2) | _BV(WDP1);   // Set Timeout to ~1 seconds
-
+  // Turn the watchdog off, in case of weird crash
+  enableWatchdog(0);
 
   // Reset the transmitter and receiver structs
   resetTransmitter();
@@ -376,7 +367,9 @@ void transmitData(volatile uint8_t freq, volatile int time_array[], volatile uin
       space(-(current_time));
     } else {
       // Else make a mark for that amount of time
+      enableWatchdog(1);
       mark(current_time);
+      enableWatchdog(0);
     }
   }
 
@@ -407,7 +400,22 @@ void space(uint32_t us) {
 /**************************************
 enableWatchdog: Turn the watchdog on or off
 **************************************/
+void enableWatchdog(uint8_t enable) {
 
+  if (!enable) {
+    cbi(MCUSR, WDRF); // Clear the WDT reset flag
+    WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit (these have to be set in the same operation)
+    WDTCSR = 0x00;  
+  } 
+  else {
+      // Set up Watch Dog Timer for Inactivity
+      WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit
+      WDTCSR =   _BV(WDIE);// |              // Enable WDT Interrupt
+             //_BV(WDP2) | _BV(WDP1);   // Set Timeout to ~1 seconds
+  }
+
+
+}
 
 /**************************************
 TIM1_COMPA_vect: IR Receive Timer.
@@ -501,12 +509,13 @@ ISR(TIM1_COMPA_vect)
 }
 
 /**************************************
-INT0_vect: SPI Receive Interrupt
+WDT_vect: Watchdog Timer Interrupt. If it
+gets fired, it means a pwm has been on
+for more than 17 ms
 **************************************/
 ISR(WDT_vect)
 {
-  setIRQ(1);
-  setIRQ(0);
+  // Turn of PWM
   enablePWM(0);
 }
 
