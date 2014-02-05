@@ -34,6 +34,9 @@ void space(uint32_t us);
 void enableIROut(uint8_t freq);
 void transmitData(volatile uint8_t freq, volatile int time_array[], volatile uint8_t arr_length);
 
+// WDT
+void enableWatchdog(uint8_t enable);
+
 /**************************************
 main: The primary loop for transmitting.
 **************************************/
@@ -82,6 +85,18 @@ void initializeIR(void) {
 
   // Stop interrupts as we setup
   cli();
+
+  // Clear the watchdog timer if it reset the device
+  if(MCUSR & (1 << WDRF)){            // If a reset was caused by the Watchdog Timer...
+    cbi(MCUSR, WDRF); // Clear the WDT reset flag
+    WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit (these have to be set in the same operation)
+    WDTCSR = 0x00;                      // Disable the WDT
+  }
+  // Set up Watch Dog Timer for Inactivity
+  WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit
+  WDTCSR =   _BV(WDIE);// |              // Enable WDT Interrupt
+             //_BV(WDP2) | _BV(WDP1);   // Set Timeout to ~1 seconds
+
 
   // Reset the transmitter and receiver structs
   resetTransmitter();
@@ -390,6 +405,11 @@ void space(uint32_t us) {
 }
 
 /**************************************
+enableWatchdog: Turn the watchdog on or off
+**************************************/
+
+
+/**************************************
 TIM1_COMPA_vect: IR Receive Timer.
 **************************************/
 ISR(TIM1_COMPA_vect)
@@ -478,6 +498,16 @@ ISR(TIM1_COMPA_vect)
     }
     break;
   }
+}
+
+/**************************************
+INT0_vect: SPI Receive Interrupt
+**************************************/
+ISR(WDT_vect)
+{
+  setIRQ(1);
+  setIRQ(0);
+  enablePWM(0);
 }
 
 /**************************************
@@ -698,3 +728,5 @@ readIR_RX: Read current state of chip select
 uint8_t readCS(void) {
   return PINB & (1 << CS);
 }
+
+

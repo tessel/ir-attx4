@@ -1,6 +1,6 @@
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include "spi_via_usi_driver.c"
+#include <avr/interrupt.h> // Supplied Interrupt Macros
+#include <avr/wdt.h> // Supplied Watch Dog Timer Macros 
+#include "spi_via_usi_driver.c" // Supplied SPI Driver
 
 #define USECPERTICK 50  // microseconds per clock interrupt tick
 #define SYSCLOCK 8000000  // attiny clock
