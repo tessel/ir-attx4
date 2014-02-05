@@ -366,9 +366,11 @@ void transmitData(volatile uint8_t freq, volatile int time_array[], volatile uin
       // Convert it to positive and make a space
       space(-(current_time));
     } else {
-      // Else make a mark for that amount of time
+      // Turn on watchdog to prevent burning out LED
       enableWatchdog(1);
+      // Enable PWM
       mark(current_time);
+      // Turn off watchdog to prevent unneccessary reset
       enableWatchdog(0);
     }
   }
@@ -409,12 +411,9 @@ void enableWatchdog(uint8_t enable) {
   } 
   else {
       // Set up Watch Dog Timer for Inactivity
+      WDTCSR = 0x00; // Timer bits set to 0 -> fires every ~16ms
       WDTCSR |= (_BV(WDCE) | _BV(WDE));   // Enable the WD Change Bit
-      WDTCSR =   _BV(WDIE);// |              // Enable WDT Interrupt
-             //_BV(WDP2) | _BV(WDP1);   // Set Timeout to ~1 seconds
   }
-
-
 }
 
 /**************************************
