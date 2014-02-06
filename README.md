@@ -1,4 +1,4 @@
-#Module Title
+#Infrared
 Driver for the ir-attx4 Tessel infrared module ([ATTX4]()).
 
 ##Really Important Information
