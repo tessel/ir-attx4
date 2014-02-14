@@ -48,7 +48,12 @@ var Infrared = function(hardware, callback) {
     // Make sure we can communicate with the module
     this.establishCommunication(3, function(err, version) {
         setImmediate(function() {
-            self.emit('connected', err);
+            if (!err) {
+                self.emit('ready', self);
+            }
+            else {
+                self.emit('error', err);
+            }
         });
         // Make sure we aren't gathering rx data until someone is listening.
         self.setListening(0);
@@ -58,6 +63,8 @@ var Infrared = function(hardware, callback) {
 
         // Complete the setup
         callback && callback(err, self);
+
+        return self;
     });
 }
 
@@ -269,7 +276,6 @@ Infrared.prototype.validateResponse = function(values, expected, callback) {
     // TODO: Replace with the 'every' method
     expected.forEach(function(element, index) {
         if (element != values[index]) {
-            console.log(values[index], "was expected to equal", element);
             res = false;
         }
     });
@@ -291,7 +297,6 @@ Infrared.prototype.SPITransfer = function(data, callback) {
 
     // Pull chip select back up
     this.chipSelect.high();
-    console.log("Received: ", ret);
     // Call any callbacks
     callback && callback(ret);
 
@@ -300,6 +305,6 @@ Infrared.prototype.SPITransfer = function(data, callback) {
 }
 
 exports.Infrared = Infrared;
-exports.connect = function (hardware, callback) {
+exports.use = function (hardware, callback) {
     return new Infrared(hardware, callback);
 };

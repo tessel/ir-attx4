@@ -22,7 +22,7 @@ var transferTest = function() {
 }
 
 function beginTest(modPort, callback) {
-  infrared.connect(modPort, function(err, mod) {
+  infrared.use(modPort, function(err, mod) {
     if (!err) {
       setInterval(transferTest.bind(mod), 3000);
     }

@@ -4,12 +4,12 @@ var tessel = require('tessel');
 var hardware = tessel.port('a');
 
 // Import library and connect to module
-var infrared = require('../index').connect(hardware);
+var infrared = require('../index').use(hardware);
 
 var counter = 0;
 
 // When we're connected
-infrared.on('connected', function(err) {
+infrared.on('ready', function() {
 	if (!err) {
 		console.log("Connected to IR!");
 
