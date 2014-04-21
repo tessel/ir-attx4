@@ -18,7 +18,7 @@ void resetReceiver(void);
 
 // SPI
 void configureSPI(void);
-void enableSPI(uint8_t enable); 
+void enableSPI(uint8_t enable);
 
 // Receiving functionality
 void configureReceiveTimerInterrupt(void);
@@ -137,6 +137,9 @@ void enableDIO(void) {
   // Set IR Detector as input
   cbi(DDRA, IR_RX);
 
+  // Set MOSI to be an input
+  cbi(DDRA, MOSI);
+
 }
 
 /**************************************
@@ -221,9 +224,6 @@ void configureSPI(void) {
 
   // Set up pull up to keep CS high
   sbi(PORTB, CS);
-
-  // Start up slave
-  spiX_initslave(0);
 
   // disable spi counter overflow enable
   USICR&= ~(1<<USIOIE);
@@ -525,6 +525,9 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
   // Disable Receive for now.
   enableReceive(0);
 
+  // Start up SPI slave
+  spiX_initslave(0);
+
   // If we were in the middle of reading a transmission
   if (receiver.state == STATE_RX_MARK || receiver.state == STATE_RX_SPACE) {
 
@@ -703,6 +706,12 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
 
   // Re-enable receiving.
   if (receiver.enabled) enableReceive(1);
+
+  // Set MOSI and MISO to be inputs so it doesn't 
+  // interfere with SPI communications for other modules
+  cbi(DDRA, MOSI);
+  cbi(DDRA, MISO);
+
 }
 
 /**************************************
@@ -736,5 +745,3 @@ readIR_RX: Read current state of chip select
 uint8_t readCS(void) {
   return PINB & (1 << CS);
 }
-
-

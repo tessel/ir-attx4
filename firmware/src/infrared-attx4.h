@@ -20,6 +20,10 @@
 #define IR_TX 7
 // Port B, pin 1
 #define IRQ 1
+// Port A, pin 5
+#define MISO 5
+// Port A, pin 6
+#define MOSI 6
 
 // Response codes
 #define ALIVE_CODE 0x55
