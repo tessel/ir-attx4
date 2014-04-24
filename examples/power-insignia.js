@@ -38,4 +38,4 @@ var powerTV = function() {
 			console.log("TV Should be powered...");
 		}
 	});
-}
+};

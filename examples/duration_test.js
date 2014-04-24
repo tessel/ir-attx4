@@ -19,7 +19,7 @@ var transferTest = function() {
       console.log("TV Should be powered...");
     }
   });
-}
+};
 
 function beginTest(modPort, callback) {
   infrared.use(modPort, function(err, mod) {
