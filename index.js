@@ -14,10 +14,9 @@ var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
 var MAX_SIGNAL_DURATION = 200;
 
-
 var Infrared = function(hardware, callback) {
 
-    this.spi = hardware.SPI({clockSpeed : 1000});
+    this.spi = hardware.SPI({clockSpeed : 1000, mode:2});
     this.chipSelect = hardware.gpio(1);
     this.reset = hardware.gpio(2);
     this.irq = hardware.gpio(3);
@@ -25,36 +24,38 @@ var Infrared = function(hardware, callback) {
     this.listening = false;
     this.chipSelect.output().high();
     this.reset.output().high();
-    this.irq.output().low().input();
+    this.irq.output().low();
 
     var self = this;
 
     // If we get a new listener
     this.on('newListener', function(event) {
         // And they are listening for rx data and we haven't been yet
-        if (!self.listening && event == "data") {
+        if (event == "length" && !this.listeners(event).length) {
             self.setListening(1);
         }
     });
 
     this.on('removeListener', function(event) {
-        console.log("Remove listener!", event);
         // If this was for the rx data event and there aren't any more listeners
-        if (event == "data" && !self.listeners(event).length) {
+        if (event == "length" && !this.listeners(event).length) {
             self.setListening(0);
         }
     });
 
     // Make sure we can communicate with the module
     this.establishCommunication(3, function(err, version) {
-        setImmediate(function() {
-            if (!err) {
-                self.emit('ready', self);
-            }
-            else {
-                self.emit('error', err);
-            }
-        });
+
+        if (err) {
+          setImmediate(function() {
+              self.emit('error', err);
+          });
+        }
+        else {
+          setImmediate(function() {
+            self.emit('ready');
+          });
+        }
         // Make sure we aren't gathering rx data until someone is listening.
         self.setListening(0);
 
@@ -63,23 +64,21 @@ var Infrared = function(hardware, callback) {
 
         // Complete the setup
         callback && callback(err, self);
-
-        return self;
     });
 }
 
 util.inherits(Infrared, EventEmitter);
 
 Infrared.prototype.IRQHandler = function() {
-
     // If we are not in the middle of transmitting
     if (!this.transmitting) {
         // Receive the durations
-        this.fetchRXDurations();
+        this.getRXDurationsLength();
+        // this.fetchRXDurations();
     } else {
         // If we are, check back in 2 seconds
         // TODO: reduce this timeout when we're running faster
-        setTimeout(this.IRQHandler.bind(this), 2000);
+        setTimeout(this.IRQHandler.bind(this), 1000);
     }
 }
 
@@ -95,10 +94,28 @@ Infrared.prototype.setListening = function(set, callback) {
         if (!valid) {
             return callback && callback(new Error("Invalid response on setting rx on/off."));
         }
+        self.listening = set ? true : false;
 
         callback && callback();
     })
 }
+
+Infrared.prototype.getRXDurationsLength = function() {
+    var self = this;
+    // We have to pull chip select high in case we were in the middle of something else
+
+
+    this.SPITransfer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00], function(response) {
+        // DO something smarter than this eventually
+
+        self.validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function(valid) {
+            if (valid) {
+                var numInt16 = response[3];
+                self.emit('length', numInt16);
+            }
+        });
+    });
+}   
 
 Infrared.prototype.fetchRXDurations = function() {
     var self = this;
@@ -124,7 +141,7 @@ Infrared.prototype.fetchRXDurations = function() {
 
                 self.SPITransfer(packet, function(response) {
 
-                    var fin = response.pop();
+                    var fin = response[response.length-1];
 
                     if (fin != FIN_CONF) {
                         console.log("Warning: Received Packet Out of Frame.");
@@ -137,18 +154,12 @@ Infrared.prototype.fetchRXDurations = function() {
 
                     else {
                         // Remove the header echoes at the beginning
-                        var arr = response.splice(rxHeader.length, response.length-rxHeader.length);
+                        var arr = response.slice(rxHeader.length, response.length);
 
                         // Emit the buffer
-                        self.emit('data', new Buffer(arr));
+                        self.emit('data', arr);
                     }
                 })
-            }
-            else {
-                // Pull chip select high because we won't be continuing to read.
-                self.chipSelect.high();
-                // We were told to read and then there wasn't data available... wtf.
-                return;
             }
         })
     })
@@ -198,7 +209,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
             }
 
             else if (!self.validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
-                err = new Error("Invalid response from raw signal packet: ", response);
+                err = new Error("Invalid response from raw signal packet: " + response);
             }
 
             setImmediate(function() {
@@ -256,7 +267,8 @@ Infrared.prototype.establishCommunication = function(retries, callback){
     var response;
     while (retries) {
         response = this.SPITransfer([FIRMWARE_CMD, 0x00, 0x00]);
-        if (this.validateResponse(response, [PACKET_CONF, FIRMWARE_CMD]) && response.length == 3) {
+        var valid = this.validateResponse(response, [PACKET_CONF, FIRMWARE_CMD]);
+        if (valid) {
             this.connected = true;
             callback && callback(null, response[2]);
             break;
@@ -271,14 +283,15 @@ Infrared.prototype.establishCommunication = function(retries, callback){
 }     
 
 Infrared.prototype.validateResponse = function(values, expected, callback) {
-    var res = true;
+    var res = false;
 
     // TODO: Replace with the 'every' method
-    expected.forEach(function(element, index) {
-        if (element != values[index]) {
-            res = false;
+    for (var i = 0; i < values.length; i++) {
+        var value = values[i];
+        if (value != 0 && value != 255) {
+            res = true;
         }
-    });
+    }
 
     setImmediate(function() {
         callback && callback(res);
@@ -290,13 +303,14 @@ Infrared.prototype.validateResponse = function(values, expected, callback) {
 Infrared.prototype.SPITransfer = function(data, callback) {
     
     // Pull Chip select down prior to transfer
-    this.chipSelect.low();
+    data = new Buffer(data);
 
+    this.chipSelect.low();
     // Send over the data
     var ret = this.spi.transferSync(data);
-
     // Pull chip select back up
     this.chipSelect.high();
+
     // Call any callbacks
     callback && callback(ret);
 
