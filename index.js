@@ -8,7 +8,7 @@ var FIN_CONF = 0x16;
 var ACK_CMD = 0x00;
 var FIRMWARE_CMD = 0x01;
 var IR_TX_CMD = 0x02;
-var IR_RX_AVAIL_CMD = 0x03
+var IR_RX_AVAIL_CMD = 0x03;
 var IR_RX_CMD = 0x04;
 var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
@@ -71,7 +71,7 @@ var Infrared = function(hardware, callback) {
       callback(err, self);
     } 
   });
-}
+};
 
 util.inherits(Infrared, EventEmitter);
 
@@ -88,7 +88,7 @@ Infrared.prototype.IRQHandler = function() {
     // If we are, check back in a little bit
     setTimeout(self.IRQHandler.bind(self), 500);
   }
-}
+};
 
 Infrared.prototype.setListening = function(set, callback) {
   var self = this;
@@ -110,7 +110,7 @@ Infrared.prototype.setListening = function(set, callback) {
       }
     }
   });
-}
+};
 
 Infrared.prototype.fetchRXDurations = function(callback) {
   var self = this;
@@ -128,7 +128,7 @@ Infrared.prototype.fetchRXDurations = function(callback) {
         var numBytes = numInt16 * 2;
 
         var rxHeader = [IR_RX_CMD, 0x00, 0x00];
-        var packet = rxHeader.concat(new Array(numBytes))
+        var packet = rxHeader.concat(new Array(numBytes));
 
 
         // Push the stop bit on there.
@@ -166,19 +166,28 @@ Infrared.prototype.fetchRXDurations = function(callback) {
               callback();
             }
           }
-        })
+        });
       }
-    })
+    });
   });
-}
+};
 
 Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback) {
   if (frequency <= 0) {
-    callback && callback(new Error("Invalid frequency. Must be greater than zero. Works best between 36-40."));
+    if (callback) {
+      callback(new Error("Invalid frequency. Must be greater than zero. Works best between 36-40."));
+    }
+
+    return;
   } 
   else if (signalDurations.length > MAX_SIGNAL_DURATION) {
-    callback && callback(new Error("Invalid buffer length. Must be between 1 and ", MAX_SIGNAL_DURATION));
-  } else {
+    if (callback) {
+      callback(new Error("Invalid buffer length. Must be between 1 and ", MAX_SIGNAL_DURATION));
+    }
+
+    return;
+  } 
+  else {
 
     this.transmitting = true;
 
@@ -203,7 +212,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
       }
     });
   }
-}
+};
 
 Infrared.prototype.constructTXPacket = function(frequency, signalDurations) {
   // Create array
@@ -214,7 +223,7 @@ Infrared.prototype.constructTXPacket = function(frequency, signalDurations) {
   tx.push(frequency);
 
   // Add length of signal durations in terms of int16s
-  tx.push(signalDurations.length/2)
+  tx.push(signalDurations.length/2);
 
   // For each signal duration
   for (var i = 0; i < signalDurations.length; i++) {
@@ -310,10 +319,10 @@ Infrared.prototype.SPITransfer = function(data, callback) {
     
   // Pull Chip select down prior to transfer
   this.chipSelect.low();
-  console.log('sending', data);
+
   // Send over the data
   var ret = this.spi.transferSync(data); 
-  console.log('received', ret);
+
   // Pull chip select back up
   this.chipSelect.high();
 
@@ -324,7 +333,7 @@ Infrared.prototype.SPITransfer = function(data, callback) {
 
   // Return the data
   return ret;
-}
+};
 
 exports.Infrared = Infrared;
 exports.use = function (hardware, callback) {
