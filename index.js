@@ -47,7 +47,6 @@ var Infrared = function(hardware, callback) {
 
   // Make sure we can communicate with the module
   this.establishCommunication(3, function(err, version) {
-    console.log('established...');
     if (err) {
       setImmediate( function() {
         // Emit an error event
@@ -141,24 +140,17 @@ Infrared.prototype.fetchRXDurations = function(callback) {
           var fin = response[response.length-1];
 
           if (fin != FIN_CONF) {
-            console.log("Warning: Received Packet Out of Frame.");
+            console.warn("Warning: Received Packet Out of Frame.");
 
             if (callback) {
               callback();
             }
-          }
-
-          if (err) {
-            if (callback) {
-              callback();
-            }
-            return;// console.log("Issue sending dummy bytes...");
           }
 
           else {
             // Remove the header echoes at the beginning
-            var buf = response.slice(rxHeader.length, response.length);
-
+            var buf = response.slice(rxHeader.length, response.length-1);
+            
             // Emit the buffer
             self.emit('data', buf);
 
