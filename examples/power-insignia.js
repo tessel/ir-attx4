@@ -14,7 +14,7 @@ infrared.on('ready', function() {
 		console.log("Connected to IR!");
 
 		// Start turning tv on and off every 3 seconds
-		setInterval(powerTV, 3000);
+		// setInterval(powerTV, 3000);
 	}
 	else {
 		console.log("Err initializing: ", err.message	);
@@ -39,3 +39,5 @@ var powerTV = function() {
 		}
 	});
 }
+
+process.ref();
