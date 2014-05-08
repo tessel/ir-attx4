@@ -1,9 +1,5 @@
 #Infrared
-Driver for the ir-attx4 Tessel infrared module ([ATTX4]()).
-
-##Really Important Information
-e.g. "this isn't ready to go yet" or "here is some special way you have to use this or it won't work"
-Hopefully we don't need this section by the time we release things to the public
+Driver for the ir-attx4 Tessel infrared module ([Attinyx4](http://www.atmel.com/Images/doc8006.pdf)).
 
 ##Installation
 ```sh
@@ -17,12 +13,10 @@ var tessel = require('tessel');
 var hardware = tessel.port("A");
 
 // Import library and connect to module
-var infrared = require('ir-attx4').connect(hardware);
-
-var counter = 0;
+var infrared = require('ir-attx4').use(hardware);
 
 // When we're connected
-infrared.on('connected', function(err) {
+infrared.on('ready', function(err) {
 	if (!err) {
 		console.log("Connected to IR!");
 
@@ -56,10 +50,27 @@ var powerTV = function() {
 
 ##Methods
 
+The primary method for sending data. The first argument is a frequency of signal in Hz, typically 38 but can range from 36 to 40. The second argument is a buffer
+of unsinged 16 bit integers representing the number of microseconds the transmission should be on. The max length of the signal durations is 100 durations.
+*  **`infrared`.sendRawSignal(frequency, signalDurations, callback)**
+
+Determines whether the module is listening for incoming signals
+Will automatically be set and unset depending on listeners for the
+`data` event.
 *  **`infrared`.setListening(set, callback)**
 
-*  **`infrared`.sendRawSignal(frequency, signalDurations, callback)**
+## Events
+
+Called when the module is detected and ready to receive commands
+*  **`infrared`.on(`ready`, callback)**
+
+Called when an IR signal is detected
+* **`infrared`.on(`data`, callback(data))**
+
+Called when there is an error connecting to the module
+* **`infrared`.on(`error`, callback(err))**
 
 ## License
 
-MIT
+MIT/Apache 2.0
+
