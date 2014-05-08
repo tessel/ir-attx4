@@ -28,8 +28,6 @@ var Infrared = function(hardware, callback) {
 
   var self = this;
 
-  console.log('is this thing even on?');
-
   // If we get a new listener
   this.on('newListener', function(event) {
     // And they are listening for rx data and we haven't been yet
@@ -46,7 +44,7 @@ var Infrared = function(hardware, callback) {
   });
 
   // Make sure we can communicate with the module
-  this.establishCommunication(3, function(err, version) {
+  this._establishCommunication(3, function(err, version) {
     if (err) {
       setImmediate( function() {
         // Emit an error event
@@ -58,34 +56,34 @@ var Infrared = function(hardware, callback) {
         // Emit a ready event
         self.emit('ready');
          // Start listening for IRQ interrupts
-        self.irq.watch('high', self.IRQHandler.bind(self));
+        self.irq.watch('high', self._IRQHandler.bind(self));
       });
     }
 
     // Make sure we aren't gathering rx data until someone is listening.
-    self.setListening(0);
-
-    // Complete the setup
-    if (callback) {
-      callback(err, self);
-    } 
+    self.setListening( function listeningSet(err) {
+      // Complete the setup
+      if (callback) {
+        callback(err, self);
+      }
+    }); 
   });
 };
 
 util.inherits(Infrared, EventEmitter);
 
-Infrared.prototype.IRQHandler = function() {
+Infrared.prototype._IRQHandler = function() {
   var self = this;
   // If we are not in the middle of transmitting
   if (!self.transmitting) {
     // Receive the durations
-    self.fetchRXDurations( function fetched() {
+    self._fetchRXDurations( function fetched() {
     // Start listening for IRQ interrupts again
-    self.irq.watch('high', self.IRQHandler.bind(self));
+    self.irq.watch('high', self._IRQHandler.bind(self));
     });
   } else {
     // If we are, check back in a little bit
-    setTimeout(self.IRQHandler.bind(self), 500);
+    setTimeout(self._IRQHandler.bind(self), 500);
   }
 };
 
@@ -94,9 +92,9 @@ Infrared.prototype.setListening = function(set, callback) {
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
 
-  var response = this.SPITransfer(new Buffer([cmd, 0x00, 0x00]));
+  var response = this._SPITransfer(new Buffer([cmd, 0x00, 0x00]));
 
-  self.validateResponse(response, [PACKET_CONF, cmd], function(valid) {
+  self._validateResponse(response, [PACKET_CONF, cmd], function(valid) {
     
     if (!valid) {
         return callback && callback(new Error("Invalid response on setting rx on/off."));
@@ -111,15 +109,15 @@ Infrared.prototype.setListening = function(set, callback) {
   });
 };
 
-Infrared.prototype.fetchRXDurations = function(callback) {
+Infrared.prototype._fetchRXDurations = function(callback) {
   var self = this;
   // We have to pull chip select high in case we were in the middle of something else
 
   // this.chipSelect.high();
-  this.SPITransfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function(response) {
+  this._SPITransfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function(response) {
     // DO something smarter than this eventually
 
-    self.validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function(valid) {
+    self._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function(valid) {
       if (valid) {
         var numInt16 = response[3];
 
@@ -135,7 +133,7 @@ Infrared.prototype.fetchRXDurations = function(callback) {
 
         packet = new Buffer(packet);
 
-        self.SPITransfer(packet, function(response) {
+        self._SPITransfer(packet, function(response) {
 
           var fin = response[response.length-1];
 
@@ -150,7 +148,7 @@ Infrared.prototype.fetchRXDurations = function(callback) {
           else {
             // Remove the header echoes at the beginning
             var buf = response.slice(rxHeader.length, response.length-1);
-            
+
             // Emit the buffer
             self.emit('data', buf);
 
@@ -186,16 +184,16 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
     var self = this;
 
     // Make the packet
-    var tx = this.constructTXPacket(frequency, signalDurations);
+    var tx = this._constructTXPacket(frequency, signalDurations);
 
     // Send it over
-    this.SPITransfer(tx, function(response) {
+    this._SPITransfer(tx, function(response) {
 
       self.transmitting = false;
       var err;
 
       // If there was an error already, set immediate on the callback
-      if (!self.validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
+      if (!self._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
           err = new Error("Invalid response from raw signal packet: " + response);
       }
       
@@ -206,7 +204,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
   }
 };
 
-Infrared.prototype.constructTXPacket = function(frequency, signalDurations) {
+Infrared.prototype._constructTXPacket = function(frequency, signalDurations) {
   // Create array
   var tx = [];
   // Add command 
@@ -234,7 +232,7 @@ Infrared.prototype.constructTXPacket = function(frequency, signalDurations) {
   return tx;
 };
 
-Infrared.prototype.establishCommunication = function(retries, callback){
+Infrared.prototype._establishCommunication = function(retries, callback){
   var self = this;
   // Grab the firmware version
   self.getFirmwareVersion(function(err, version) {
@@ -249,7 +247,7 @@ Infrared.prototype.establishCommunication = function(retries, callback){
       }
       // Else call recursively
       else {
-        self.establishCommunication(retries, callback);
+        self._establishCommunication(retries, callback);
       }
     }
     // If there was no error
@@ -267,11 +265,11 @@ Infrared.prototype.establishCommunication = function(retries, callback){
 Infrared.prototype.getFirmwareVersion = function(callback) {
   var self = this;
 
-  self.SPITransfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function(response) {
+  self._SPITransfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function(response) {
     if (err) {
       return callback(err, null);
     }
-    else if (self.validateResponse(response, [false, FIRMWARE_CMD]) && response.length === 3) 
+    else if (self._validateResponse(response, [false, FIRMWARE_CMD]) && response.length === 3) 
     {
       if (callback) {
         callback(null, response[2]);
@@ -286,7 +284,7 @@ Infrared.prototype.getFirmwareVersion = function(callback) {
   });
 };    
 
-Infrared.prototype.validateResponse = function(values, expected, callback) {
+Infrared.prototype._validateResponse = function(values, expected, callback) {
 
   var res = true;
 
@@ -307,7 +305,7 @@ Infrared.prototype.validateResponse = function(values, expected, callback) {
   return res;
 };
 
-Infrared.prototype.SPITransfer = function(data, callback) {
+Infrared.prototype._SPITransfer = function(data, callback) {
     
   // Pull Chip select down prior to transfer
   this.chipSelect.low();
