@@ -25,10 +25,10 @@ var MAX_SIGNAL_DURATION = 200;
 
 var Infrared = function(hardware, callback) {
 
-  this.spi = hardware.SPI({clockSpeed : 1000, mode:2});
   this.chipSelect = hardware.gpio(1);
   this.reset = hardware.gpio(2);
   this.irq = hardware.gpio(3);
+  this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect});
   this.transmitting = false;
   this.listening = false;
   this.chipSelect.output().high();
@@ -101,20 +101,20 @@ Infrared.prototype.setListening = function(set, callback) {
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
 
-  var response = this._SPITransfer(new Buffer([cmd, 0x00, 0x00]));
-
-  self._validateResponse(response, [PACKET_CONF, cmd], function(valid) {
+  self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet(err, response) {
+    self._validateResponse(response, [PACKET_CONF, cmd], function(valid) {
     
-    if (!valid) {
-        return callback && callback(new Error("Invalid response on setting rx on/off."));
-    }
-    else {
-      self.listening = set ? true : false;
-
-      if (callback) {
-        callback();
+      if (!valid) {
+          return callback && callback(new Error("Invalid response on setting rx on/off."));
       }
-    }
+      else {
+        self.listening = set ? true : false;
+
+        if (callback) {
+          callback();
+        }
+      }
+    });
   });
 };
 
@@ -123,7 +123,7 @@ Infrared.prototype._fetchRXDurations = function(callback) {
   // We have to pull chip select high in case we were in the middle of something else
 
   // this.chipSelect.high();
-  this._SPITransfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function(response) {
+  self.spi.transfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete(err, response) {
     // DO something smarter than this eventually
 
     self._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function(valid) {
@@ -142,7 +142,7 @@ Infrared.prototype._fetchRXDurations = function(callback) {
 
         packet = new Buffer(packet);
 
-        self._SPITransfer(packet, function(response) {
+        self.spi.transfer(packet, function spiComplete(err, response) {
 
           var fin = response[response.length-1];
 
@@ -155,7 +155,7 @@ Infrared.prototype._fetchRXDurations = function(callback) {
           }
 
           else {
-            // Remove the header echoes at the beginning
+            // Remove the header echoes at the beginning and stop bit
             var buf = response.slice(rxHeader.length, response.length-1);
 
             // Emit the buffer
@@ -196,7 +196,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
     var tx = this._constructTXPacket(frequency, signalDurations);
 
     // Send it over
-    this._SPITransfer(tx, function(response) {
+    this.spi.transfer(tx, function spiComplete(err, response) {
 
       self.transmitting = false;
       var err;
@@ -274,7 +274,7 @@ Infrared.prototype._establishCommunication = function(retries, callback){
 Infrared.prototype.getFirmwareVersion = function(callback) {
   var self = this;
 
-  self._SPITransfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function(response) {
+  self.spi.transfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function spiComplete(err, response) {
     if (err) {
       return callback(err, null);
     }
@@ -312,26 +312,6 @@ Infrared.prototype._validateResponse = function(values, expected, callback) {
   }
 
   return res;
-};
-
-Infrared.prototype._SPITransfer = function(data, callback) {
-    
-  // Pull Chip select down prior to transfer
-  this.chipSelect.low();
-
-  // Send over the data
-  var ret = this.spi.transferSync(data); 
-
-  // Pull chip select back up
-  this.chipSelect.high();
-
-  // Call any callbacks
-  if (callback) {
-    callback(ret);
-  }
-
-  // Return the data
-  return ret;
 };
 
 exports.Infrared = Infrared;
