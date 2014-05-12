@@ -203,7 +203,7 @@ Infrared.prototype.sendRawSignal = function(frequency, signalDurations, callback
 
       // If there was an error already, set immediate on the callback
       if (!self._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
-          err = new Error("Invalid response from raw signal packet: " + response);
+          err = new Error("Invalid response from raw signal packet.");
       }
       
       if (callback) {
