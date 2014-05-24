@@ -3,25 +3,20 @@
   "version": "0.0.4",
   "description": "The library for sending and receiving IR data from a Tessel IR Module",
   "main": "index.js",
-  "repository" : "github.com/tessel/ir-attx4",
+  "repository": "github.com/tessel/ir-attx4",
   "directories": {
     "example": "examples"
   },
   "scripts": {
-    "test": "./testsuite.js"
+    "test": "tinytap -e 'tessel run {}' test/*.js"
   },
   "hardware": {
     "./examples": false,
-    "./firmware" : false,
-    "tape": false,
-    "tap": false,
-    "shelljs": false
-  },
-  "devDependencies": {
-    "tape": "~2.3.2",
-    "tap": "git+https://github.com/tcr/node-tap.git#3cb76e",
-    "shelljs": "~0.3.0"
+    "./firmware": false
   },
   "author": "",
-  "license": "MIT/Apache 2.0"
+  "license": "MIT/Apache 2.0",
+  "devDependencies": {
+    "tinytap": "~0.0.2"
+  }
 }
