@@ -3,11 +3,8 @@
 
 var tessel = require('tessel');
 
-// Connect the IR module to port a
-var hardware = tessel.port['A'];
-
-// Import library and connect to module
-var infrared = require('../').use(hardware);
+// Import library and connect to module on port A
+var infrared = require('../').use(tessel.port['A']);
 
 // When we're connected
 infrared.on('ready', function() {
