@@ -27,13 +27,12 @@ var Infrared = function(hardware, callback) {
 
   this.chipSelect = hardware.digital[0];
   this.reset = hardware.digital[1];
-  this.irq = hardware.digital[2];
+  this.irq = hardware.digital[2].rawWrite(false);
   this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect});
   this.transmitting = false;
   this.listening = false;
   this.chipSelect.output().high();
   this.reset.output().high();
-  this.irq.output().low();
 
   var self = this;
 
@@ -64,7 +63,7 @@ var Infrared = function(hardware, callback) {
         // Emit a ready event
         self.emit('ready');
          // Start listening for IRQ interrupts
-        self.irq.watch('high', self._IRQHandler.bind(self));
+        self.irq.once('high', self._IRQHandler.bind(self));
       });
     }
 
@@ -87,7 +86,7 @@ Infrared.prototype._IRQHandler = function () {
     // Receive the durations
     self._fetchRXDurations(function fetched () {
       // Start listening for IRQ interrupts again
-      self.irq.watch('high', self._IRQHandler.bind(self));
+      self.irq.once('high', self._IRQHandler.bind(self));
     });
   } else {
     // If we are, check back in a little bit
