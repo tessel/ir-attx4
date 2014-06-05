@@ -1,5 +1,5 @@
 #Infrared
-Driver for the ir-attx4 Tessel infrared module. The hardware documentation for this module can be found [here](https://github.com/tessel/hardware/blob/master/modules-overview.md#ir).
+Driver for the ir-attx4 Tessel infrared module. The hardware documentation for this module can be found [here](https://github.com/tessel/hardware/blob/master/modules-overview.md#infrared).
 
 If you run into any issues you can ask for support on the [Relay Module Forums](http://forums.tessel.io/category/ir).
 
