@@ -1,7 +1,7 @@
 #Infrared
 Driver for the ir-attx4 Tessel infrared module. The hardware documentation for this module can be found [here](https://github.com/tessel/hardware/blob/master/modules-overview.md#infrared).
 
-If you run into any issues you can ask for support on the [Relay Module Forums](http://forums.tessel.io/category/ir).
+If you run into any issues you can ask for support on the [IR Module Forums](http://forums.tessel.io/category/ir).
 
 ###Installation
 ```sh
@@ -19,7 +19,8 @@ infrared data.
 *********************************************/
 
 var tessel = require('tessel');
-var infrared = require('ir-attx4').use(tessel.port['A']); 
+var infraredlib = require('ir-attx4');
+var infrared = infraredlib.use(tessel.port['A']); 
 
 // When we're connected
 infrared.on('ready', function() {
