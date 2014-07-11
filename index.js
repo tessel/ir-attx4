@@ -165,6 +165,12 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
     return;
   } 
 
+  if (signalDurations.length % 2 != 0) {
+    if (callback) {
+      callback(new Error("Invalid buffer size. Transmission buffers must be an even length of 8 bit values representing 16-bit words."));
+    }
+  }
+
   this.transmitting = true;
   var self = this;
 
