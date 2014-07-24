@@ -8,7 +8,7 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "tinytap -e 'tessel run {}' test/*.js"
+    "test": "tinytap -e 'tessel run {} ${IR_PORT1} ${IR_PORT2}' test/*.js"
   },
   "hardware": {
     "./examples": false,
