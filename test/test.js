@@ -10,7 +10,7 @@ var infrared2;
 
 var testSignal = new Buffer([0, 178, 255, 168, 0, 12, 255, 246, 0, 13, 255, 225, 0, 13]);
 
-test.count(7);
+test.count(11);
 
 async.series([
 
@@ -165,7 +165,13 @@ async.series([
       t.equal(err, undefined, 'error thrown on signal sending.');
     });
   }),
-
+  
+  test('error should be thrown on buffers greater than 100 16-bit words', function(t) {
+    infrared2.sendRawSignal(36, new Buffer((100 * 2) + 1), function(err) {
+      t.ok(err, 'No error was thrown on a buffer that is too large to handle');
+      t.end();
+    });
+  }),
 
 ],
 function (err) {
