@@ -68,7 +68,8 @@ var Infrared = function(hardware, callback) {
     }
 
     // Make sure we aren't gathering rx data until someone is listening.
-    self.setListening( function listeningSet(err) {
+    var listening = self.listeners('data').length ? true : false;
+    self.setListening(false, function listeningSet(err) {
       // Complete the setup
       if (callback) {
         callback(err, self);
@@ -98,10 +99,8 @@ Infrared.prototype.setListening = function (set, callback) {
   var self = this;
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
-
   self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
     self._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
-    
       if (!valid) {
         callback && callback(new Error("Invalid response on setting rx on/off."));
       } else {
