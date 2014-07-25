@@ -143,6 +143,11 @@ Infrared.prototype._fetchRXDurations = function (callback) {
             // Remove the header echoes at the beginning and stop bit
             var buf = response.slice(rxHeader.length, response.length - 1);
 
+            // Remove first two bytes of signal durations b/c they
+            // are just an indicator of how long it's been since
+            // last received data
+            buf = buf.slice(2, response.length-1);
+
             // Emit the buffer
             self.emit('data', buf);
             callback && callback();
