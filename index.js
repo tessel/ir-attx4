@@ -50,14 +50,14 @@ var Infrared = function(hardware, callback) {
   this.on('newListener', function (event) {
     // And they are listening for rx data and we haven't been yet
     if (event == 'data' && !this.listeners(event).length) {
-      self.setListening(1);
+      self._setListening(1);
     }
   });
 
   this.on('removeListener', function (event) {
     // If this was for the rx data event and there aren't any more listeners
     if (event == 'data' && !this.listeners(event).length) {
-      self.setListening(0);
+      self._setListening(0);
     }
   });
 
@@ -91,7 +91,7 @@ var Infrared = function(hardware, callback) {
           // Make sure we aren't gathering rx data until someone is listening.
           var listening = self.listeners('data').length ? true : false;
 
-          self.setListening(listening, function listeningSet(err) {
+          self._setListening(listening, function listeningSet(err) {
             // Complete the setup
             if (callback) {
               callback(err, self); 
@@ -120,7 +120,7 @@ Infrared.prototype._IRQHandler = function () {
   }
 };
 
-Infrared.prototype.setListening = function (set, callback) {
+Infrared.prototype._setListening = function (set, callback) {
   var self = this;
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;

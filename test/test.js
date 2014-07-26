@@ -10,7 +10,7 @@ var infrared2;
 
 var testSignal = new Buffer([0, 178, 255, 168, 0, 12, 255, 246, 0, 13, 255, 225, 0, 13]);
 
-test.count(11);
+test.count(9);
 
 async.series([
 
@@ -78,28 +78,22 @@ async.series([
   }),
 
 
-  test('calling setListening with false', function(t) {
+  test('removing listeners should stop IRQs', function(t) {
 
-    // If infrared1 gets data
-    infrared1.once('data', function(data) {
-      console.log('this console log doesnt even work!');
-      console.log('shit i got data', data);
-      // Then it didn't stop listening properly
-      t.fail("setListening with false doesn't stop it from picking up data");
-    });
+    infrared1.removeAllListeners('data');
 
-    // Tell the first infrared to not listen
-    console.log('setting listening to', false);
-    infrared1.setListening(false, function(err) {
-
-      // Make sure there was no error
-      t.equal(err, undefined, 'Error when setting listener to false');
+    setImmediate(function() {
+      // If infrared1 gets data
+      infrared1.irq.once('high', function testFailed() {
+        t.fail("removing listeners doesn't stop it from picking up data");
+      });
 
       // Set a timeout that gets called to pass this test
       var timeout = setTimeout(function testPassed() {
         infrared1.removeAllListeners('data');
+        infrared1.irq.removeAllListeners('high');
         t.end();
-      }, 500);
+      }, 1000);
 
       // Tell infrared2 to send a signal
       infrared2.sendRawSignal(38, testSignal, function(err) {
@@ -108,33 +102,25 @@ async.series([
     });
   }),
 
-  test('calling setListening with true', function(t) {
-    // Tell the infrared2 to  listen
-    infrared2.setListening(true, function(err) {
+  test('listening for data should enable IRQs', function(t) {
 
-      // Make sure there was no error
-      t.equal(err, undefined, 'Error when setting listener to true');
+    // Set a timeout that gets called to pass this test
+    var timeout = setTimeout(function testPassed() {
+      // Then it didn't stop listening properly
+      t.fail("_setListening with true doesn't cause it to pick up data.");
+    }, 1000);
 
-      // Set a timeout that gets called to pass this test
-      var timeout = setTimeout(function testPassed() {
-        // Then it didn't stop listening properly
-        t.fail("setListening with true doesn't cause it to pick up data.");
-      }, 5000);
+    // If infrared2 gets data
+    infrared1.once('data', function(data) {
+      clearTimeout(timeout);
+      // Then it didn't stop listening properly
+      t.ok(data, "_setListening with true calls data event with no data.");
+      t.end();
+    });
 
-      // If infrared2 gets data
-      infrared2.once('data', function(data) {
-        clearTimeout(timeout);
-        // Then it didn't stop listening properly
-        t.ok(data, "setListening with true calls data event with no data.");
-        t.end();
-      });
-
-      console.log('are we listneing?', infrared2.listening);
-
-      // Tell infrared1 to send a signal
-      infrared1.sendRawSignal(38, testSignal, function(err) {
-        t.equal(err, undefined, 'error thrown on signal sending.');
-      });
+    // Tell infrared1 to send a signal
+    infrared2.sendRawSignal(38, testSignal, function(err) {
+      t.equal(err, undefined, 'error thrown on signal sending.');
     });
   }),
 
@@ -150,9 +136,7 @@ async.series([
     infrared2.once('data', function(data) {
       clearTimeout(timeout);
       // Then it didn't stop listening properly
-      t.ok(data, "setListening with true doesn't pick up data");
-      console.log('rx', data);
-      console.log('tx', testSignal);
+      t.ok(data, "_setListening with true doesn't pick up data");
       // Test that the length of the received and sent signals are the same
       t.equal(data.length, testSignal.length, 'received and sent signals are different lengths.');
 
