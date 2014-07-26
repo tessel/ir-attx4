@@ -9,6 +9,7 @@
 
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
+var firmware = require('./lib/firmware');
 
 var PACKET_CONF = 0x55;
 var ACK_CONF = 0x33;
@@ -21,18 +22,27 @@ var IR_RX_AVAIL_CMD = 0x03;
 var IR_RX_CMD = 0x04;
 var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
+var CRC_CMD = 0x06;
 var MAX_SIGNAL_DURATION = 200;
+
+// These should be updated with each firmware release
+var FIRMWARE_VERSION = 0x02;
+var CRC_HIGH = 0x79;
+var CRC_LOW = 0xA8;
+
+var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
 var Infrared = function(hardware, callback) {
 
+  this.hardware = hardware;
   this.chipSelect = hardware.digital[0];
   this.reset = hardware.digital[1];
   this.irq = hardware.digital[2].rawWrite(false);
   this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect});
   this.transmitting = false;
   this.listening = false;
-  this.chipSelect.output().high();
-  this.reset.output().high();
+  this.chipSelect.output(true);
+  this.reset.output(true);
 
   var self = this;
 
@@ -51,30 +61,45 @@ var Infrared = function(hardware, callback) {
     }
   });
 
+  var emitError = function(err) {
+    setImmediate(function () {
+      // Emit an error event
+      self.emit('error', err);
+    });
+  }
+
   // Make sure we can communicate with the module
   this._establishCommunication(3, function (err, version) {
     if (err) {
-      setImmediate(function () {
-        // Emit an error event
-        self.emit('error');
-      });
-    } else {
-      setImmediate(function () {
-        // Emit a ready event
-        self.emit('ready');
-         // Start listening for IRQ interrupts
-        self.irq.once('high', self._IRQHandler.bind(self));
-      });
-    }
+      emitError(err);
+    } 
+    else {
+      self.checkForFirmwareUpdate(version, function afterUpdate(err) {
+        if (err) {
+          emitError(err);
+        } 
+        else {
+          self.connected = true;
 
-    // Make sure we aren't gathering rx data until someone is listening.
-    var listening = self.listeners('data').length ? true : false;
-    self.setListening(false, function listeningSet(err) {
-      // Complete the setup
-      if (callback) {
-        callback(err, self);
-      }
-    }); 
+          setImmediate(function () {
+            // Emit a ready event
+            self.emit('ready');
+            // Start listening for IRQ interrupts
+            self.irq.once('high', self._IRQHandler.bind(self));
+          });
+
+          // Make sure we aren't gathering rx data until someone is listening.
+          var listening = self.listeners('data').length ? true : false;
+
+          self.setListening(false, function listeningSet(err) {
+            // Complete the setup
+            if (callback) {
+              callback(err, self); 
+            }
+          });
+        }
+      });
+    } 
   });
 };
 
@@ -100,11 +125,23 @@ Infrared.prototype.setListening = function (set, callback) {
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
   self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
+    console.log('received', response);
     self._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
       if (!valid) {
         callback && callback(new Error("Invalid response on setting rx on/off."));
       } else {
         self.listening = set ? true : false;
+        // If we aren't listening any more
+        if (!self.listening) {
+          // Remove this GPIO interrupt
+          self.irq.removeAllListeners();
+        }
+        else {
+          // Make sure it calls the IRQ handler
+          if (!self.irq.listeners('high').length) {
+            self.irq.once('high', self._IRQHandler.bind(self));
+          }
+        }
         callback && callback();
       }
     });
@@ -149,6 +186,7 @@ Infrared.prototype._fetchRXDurations = function (callback) {
             buf = buf.slice(2, response.length-1);
 
             // Emit the buffer
+            console.log('emitting data!', data);
             self.emit('data', buf);
             callback && callback();
           }
@@ -157,6 +195,14 @@ Infrared.prototype._fetchRXDurations = function (callback) {
     });
   });
 };
+
+function updateFirmware(hardware, fname, callback) {
+  var self = this;
+  console.log('updating firmware');
+  firmware.update( hardware, fname, function(){
+    callback && callback();
+  });
+}
 
 Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callback) {
   if (frequency <= 0) {
@@ -223,6 +269,7 @@ Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
 Infrared.prototype._establishCommunication = function (retries, callback){
   var self = this;
   // Grab the firmware version
+  console.log('still establishing communication');
   self.getFirmwareVersion(function (err, version) {
     // If it didn't work
     if (err) {
@@ -248,7 +295,7 @@ Infrared.prototype._establishCommunication = function (retries, callback){
 
 Infrared.prototype.getFirmwareVersion = function (callback) {
   var self = this;
-
+  console.log('getting firmware version!');
   self.spi.transfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function spiComplete (err, response) {
     if (err) {
       return callback(err, null);
@@ -276,12 +323,71 @@ Infrared.prototype._validateResponse = function (values, expected, callback) {
   return res;
 };
 
+Infrared.prototype.checkForFirmwareUpdate = function(version, callback) {
+  if (version < FIRMWARE_VERSION){
+    console.log('New IR module firmware available - updating...');
+    this.updateFirmware( FIRMWARE_FILE, callback);
+  }
+  else {
+    if (callback)
+      callback();
+  }
+}
+
+Infrared.prototype.readFirmwareCRC = function(retries, callback) {
+  var self = this;
+  self.spi.transfer(new Buffer([CRC_CMD, 0x00, 0x00, 0x00]), function gotCRC(err, res){
+    console.log('crc response', err, res);
+    if (err) {
+      return callback(err);
+    } else if (self._validateResponse(res, [false, CRC_CMD, CRC_HIGH, CRC_LOW]) && res.length === 4) {
+      if (callback) {
+        callback(null);
+      }
+    } else {
+      retries--;
+      if (retries > 0){
+        self.readFirmwareCRC(retries, callback);
+      } else {
+        self.updateFirmware(FIRMWARE_FILE, callback);
+      }
+    }
+  });
+};
+
+Infrared.prototype.updateFirmware = function( fname, callback) {
+  var self = this;
+
+  firmware.update(self.hardware, fname, function(){
+    setTimeout( function(){
+      self.readFirmwareCRC(5, callback);
+    }, 500);
+  });
+};
+
+Infrared.prototype.timerAbstraction = function(buffer) {
+  // The attiny as a timer with period of 50
+  var timerTicks = 50;
+
+  /* Timings are recorded in terms of
+  50uS ticks. Multiplying by 50 will return
+  an actual duration */
+  for (var i = 0; i < buffer.length; i+=2) {
+    var raw = buffer.readInt16BE(i);
+    buffer.writeInt16BE(raw * timerTicks, i);
+  }
+
+  return buffer;
+}
+
+function use (hardware, callback) {
+  return new Infrared(hardware, callback);
+}
 
 /**
  * Public API
  */
 
 exports.Infrared = Infrared;
-exports.use = function (hardware, callback) {
-    return new Infrared(hardware, callback);
-};
+exports.use = use;
+exports.updateFirmware = updateFirmware;

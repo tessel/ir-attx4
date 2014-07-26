@@ -32,7 +32,7 @@ async.series([
     // Cancelled by the ready event
     var timeout = setTimeout(function eventNotCalled() {
       t.fail("Ready event never fired on module 2 connection.");
-    }, 2000);
+    }, 10000);
 
     // Connect to the port
     infrared2 = infraredLib.use(tessel.port[portName2]);
@@ -79,7 +79,17 @@ async.series([
 
 
   test('calling setListening with false', function(t) {
+
+    // If infrared1 gets data
+    infrared1.once('data', function(data) {
+      console.log('this console log doesnt even work!');
+      console.log('shit i got data', data);
+      // Then it didn't stop listening properly
+      t.fail("setListening with false doesn't stop it from picking up data");
+    });
+
     // Tell the first infrared to not listen
+    console.log('setting listening to', false);
     infrared1.setListening(false, function(err) {
 
       // Make sure there was no error
@@ -90,12 +100,6 @@ async.series([
         infrared1.removeAllListeners('data');
         t.end();
       }, 500);
-
-      // If infrared1 gets data
-      infrared1.once('data', function(data) {
-        // Then it didn't stop listening properly
-        t.fail("setListening with false doesn't stop it from picking up data");
-      });
 
       // Tell infrared2 to send a signal
       infrared2.sendRawSignal(38, testSignal, function(err) {
@@ -114,16 +118,19 @@ async.series([
       // Set a timeout that gets called to pass this test
       var timeout = setTimeout(function testPassed() {
         // Then it didn't stop listening properly
-        t.fail("setListening with false doesn't stop it from picking up data.");
-      }, 500);
+        t.fail("setListening with true doesn't cause it to pick up data.");
+      }, 5000);
 
       // If infrared2 gets data
       infrared2.once('data', function(data) {
         clearTimeout(timeout);
+        console.log('okay, they both got data?');
         // Then it didn't stop listening properly
-        t.ok(data, "setListening with true doesn't pick up data.");
+        t.ok(data, "setListening with true calls data event with no data.");
         t.end();
       });
+
+      console.log('are we listneing?', infrared2.listening);
 
       // Tell infrared1 to send a signal
       infrared1.sendRawSignal(38, testSignal, function(err) {

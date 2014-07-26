@@ -12,6 +12,8 @@
 volatile receiver_t receiver;
 volatile transmitter_t transmitter;
 
+// Program Flash Checksum
+volatile unsigned short checksum = 0xffff;
 
 // Pin toggling
 uint8_t readIR_RX(void);
@@ -46,10 +48,15 @@ void transmitData(volatile uint8_t freq, volatile int time_array[], volatile uin
 // WDT
 void enableWatchdog(uint8_t enable);
 
+extern void _exit();
+
 /**************************************
 main: The primary loop for transmitting.
 **************************************/
 int main(void) {
+
+  // Set the checksum
+  checksum = crc16( (unsigned short) _exit << 1 );
 
   // Get everything all configured
   initializeIR();
@@ -615,7 +622,7 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
       spiX_wait();
 
       // Save to buffer
-      transmitter.txbuf[i] = temp * 50;
+      transmitter.txbuf[i] = temp;
     }
 
     // Put the finish code
@@ -687,7 +694,7 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
     break;
 
   // If they want the LED on
-  case START_RX:
+  case START_RX_CMD:
     // Make sure IRQ isn't asserted yet
     setIRQ(0);
     resetReceiver();
@@ -698,13 +705,20 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
     break;
 
   // If they want it off
-  case STOP_RX:
+  case STOP_RX_CMD:
     // Turn it off
     receiver.enabled = 0;
     // Make sure IRQ isn't asserted
     setIRQ(0);
     // Comfirm the value was set
     spiX_put(0);
+    spiX_wait();
+    break;
+
+  case CRC_CMD:
+    spiX_put((checksum >> 8) & 0xff);
+    spiX_wait();
+    spiX_put((checksum >> 0) & 0xff);
     spiX_wait();
     break;
   }
@@ -753,4 +767,31 @@ readIR_RX: Read current state of chip select
 **************************************/
 uint8_t readCS(void) {
   return PINB & (1 << CS);
+}
+
+unsigned short crc16( unsigned short length)
+{
+  unsigned char i;
+  unsigned int data;
+  unsigned int crc = 0xffff;
+  char *data_p = 0x0000;
+
+  if (length == 0)
+        return (~crc);
+  do
+  {
+        for (i=0, data= pgm_read_byte(data_p++);
+             i < 8;
+             i++, data >>= 1)
+        {
+              if ((crc & 0x0001) ^ (data & 0x0001))
+                    crc = (crc >> 1) ^ POLY;
+              else  crc >>= 1;
+        }
+  } while (--length);
+  crc = ~crc;
+  data = crc;
+  crc = (crc << 8) | (data >> 8 & 0xff);
+
+  return (crc);
 }
