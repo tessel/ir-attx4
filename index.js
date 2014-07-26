@@ -27,8 +27,8 @@ var MAX_SIGNAL_DURATION = 200;
 
 // These should be updated with each firmware release
 var FIRMWARE_VERSION = 0x02;
-var CRC_HIGH = 0x79;
-var CRC_LOW = 0xA8;
+var CRC_HIGH = 0xFB;
+var CRC_LOW = 0xAA;
 
 var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
@@ -91,7 +91,7 @@ var Infrared = function(hardware, callback) {
           // Make sure we aren't gathering rx data until someone is listening.
           var listening = self.listeners('data').length ? true : false;
 
-          self.setListening(false, function listeningSet(err) {
+          self.setListening(listening, function listeningSet(err) {
             // Complete the setup
             if (callback) {
               callback(err, self); 
@@ -125,7 +125,6 @@ Infrared.prototype.setListening = function (set, callback) {
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
   self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
-    console.log('received', response);
     self._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
       if (!valid) {
         callback && callback(new Error("Invalid response on setting rx on/off."));
@@ -151,8 +150,6 @@ Infrared.prototype.setListening = function (set, callback) {
 Infrared.prototype._fetchRXDurations = function (callback) {
   var self = this;
   // We have to pull chip select high in case we were in the middle of something else
-
-  // this.chipSelect.high();
   self.spi.transfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete (err, response) {
     // DO something smarter than this eventually
 
@@ -186,7 +183,6 @@ Infrared.prototype._fetchRXDurations = function (callback) {
             buf = buf.slice(2, response.length-1);
 
             // Emit the buffer
-            console.log('emitting data!', data);
             self.emit('data', buf);
             callback && callback();
           }
@@ -198,7 +194,7 @@ Infrared.prototype._fetchRXDurations = function (callback) {
 
 function updateFirmware(hardware, fname, callback) {
   var self = this;
-  console.log('updating firmware');
+  console.warn('updating firmware');
   firmware.update( hardware, fname, function(){
     callback && callback();
   });
@@ -269,7 +265,6 @@ Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
 Infrared.prototype._establishCommunication = function (retries, callback){
   var self = this;
   // Grab the firmware version
-  console.log('still establishing communication');
   self.getFirmwareVersion(function (err, version) {
     // If it didn't work
     if (err) {
@@ -295,7 +290,7 @@ Infrared.prototype._establishCommunication = function (retries, callback){
 
 Infrared.prototype.getFirmwareVersion = function (callback) {
   var self = this;
-  console.log('getting firmware version!');
+
   self.spi.transfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function spiComplete (err, response) {
     if (err) {
       return callback(err, null);
@@ -337,7 +332,6 @@ Infrared.prototype.checkForFirmwareUpdate = function(version, callback) {
 Infrared.prototype.readFirmwareCRC = function(retries, callback) {
   var self = this;
   self.spi.transfer(new Buffer([CRC_CMD, 0x00, 0x00, 0x00]), function gotCRC(err, res){
-    console.log('crc response', err, res);
     if (err) {
       return callback(err);
     } else if (self._validateResponse(res, [false, CRC_CMD, CRC_HIGH, CRC_LOW]) && res.length === 4) {
@@ -349,7 +343,8 @@ Infrared.prototype.readFirmwareCRC = function(retries, callback) {
       if (retries > 0){
         self.readFirmwareCRC(retries, callback);
       } else {
-        self.updateFirmware(FIRMWARE_FILE, callback);
+        // self.updateFirmware(FIRMWARE_FILE, callback);
+        console.log('bad crc');
       }
     }
   });

@@ -124,7 +124,6 @@ async.series([
       // If infrared2 gets data
       infrared2.once('data', function(data) {
         clearTimeout(timeout);
-        console.log('okay, they both got data?');
         // Then it didn't stop listening properly
         t.ok(data, "setListening with true calls data event with no data.");
         t.end();
@@ -145,10 +144,10 @@ async.series([
     var timeout = setTimeout(function testPassed() {
       // Then it didn't stop listening properly
       t.fail("no data was picked up within time window.");
-    }, 500);
+    }, 2000);
 
     // If infrared2 gets data
-    infrared2.on('data', function(data) {
+    infrared2.once('data', function(data) {
       clearTimeout(timeout);
       // Then it didn't stop listening properly
       t.ok(data, "setListening with true doesn't pick up data");

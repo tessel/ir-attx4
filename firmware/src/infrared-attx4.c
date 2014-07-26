@@ -622,7 +622,7 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
       spiX_wait();
 
       // Save to buffer
-      transmitter.txbuf[i] = temp;
+      transmitter.txbuf[i] = temp * 50;
     }
 
     // Put the finish code
@@ -728,7 +728,7 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
   USICR&= ~(1<<USIWM0);
 
   // Re-enable receiving.
-  if (receiver.enabled) enableReceive(1);
+  enableReceive(receiver.enabled);
 
   // Set MOSI and MISO to be inputs so it doesn't 
   // interfere with SPI communications for other modules
