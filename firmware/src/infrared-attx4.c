@@ -464,8 +464,6 @@ ISR(TIM1_COMPA_vect)
       else {
         // gap just ended, record duration and start recording transmission
         receiver.rxlen = 0;
-        // gap lenghs are negative
-        receiver.rxbuf[receiver.rxlen++] = -(receiver.timer);
         // reseet the timer
         receiver.timer = 0;
         // We're now on a mark
@@ -479,7 +477,7 @@ ISR(TIM1_COMPA_vect)
     // And the mark just ended
     if (irdata == SPACE) {
       // Record the number of ticks
-      receiver.rxbuf[receiver.rxlen++] = receiver.timer;
+      receiver.rxbuf[receiver.rxlen++] = receiver.timer * USECPERTICK;
       // Reset the timer
       receiver.timer = 0;
       // We're on a space now
@@ -492,7 +490,7 @@ ISR(TIM1_COMPA_vect)
     // and we get a mark
     if (irdata == MARK) { 
       // Save the time because we're on a mark now!
-      receiver.rxbuf[receiver.rxlen++] = -(receiver.timer);
+      receiver.rxbuf[receiver.rxlen++] = -(receiver.timer * USECPERTICK);
       // Reset the timer
       receiver.timer = 0;
       // We're on a mark
@@ -622,7 +620,7 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
       spiX_wait();
 
       // Save to buffer
-      transmitter.txbuf[i] = temp * 50;
+      transmitter.txbuf[i] = temp;
     }
 
     // Put the finish code

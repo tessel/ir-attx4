@@ -8,7 +8,7 @@ var infraredLib = require('../index');
 var infrared1;
 var infrared2;
 
-var testSignal = new Buffer([0, 178, 255, 168, 0, 12, 255, 246, 0, 13, 255, 225, 0, 13]);
+var testSignal = new Buffer([0x22, 0xc4, 0xee, 0xd0, 0x02, 0x58, 0xfe, 0x0c, 0x02, 0x8a, 0xf9, 0xf2, 0x02, 0x8a]);
 
 test.count(9);
 
@@ -137,13 +137,14 @@ async.series([
       clearTimeout(timeout);
       // Then it didn't stop listening properly
       t.ok(data, "_setListening with true doesn't pick up data");
+      console.log('got this data', data);
       // Test that the length of the received and sent signals are the same
       t.equal(data.length, testSignal.length, 'received and sent signals are different lengths.');
 
       // Test that all of the bytes are the same
       for (var i = 0; i < data.length; i++) {
-        if (Math.abs(data[i] - testSignal[i] > 5)) {
-          t.fail('received and sent signals have wildly different payloads.');
+        if (Math.abs(data[i] - testSignal[i] > 50)) {
+          t.fail('received and sent signals have different payloads.');
         }
       }
 

@@ -28,8 +28,8 @@ infrared.on('ready', function() {
     console.log("Connected to IR!");
     // Start sending a signal every three seconds
     setInterval(function() {
-      // Make a buffer of on/off durations (each duration is 16 bits)
-      var powerBuffer = new Buffer([0, 178, 255, 168, 0, 12, 255, 246, 0, 13, 255, 225, 0, 13, 255, 224, 0, 12, 255, 246, 0, 12, 255, 246, 0, 13, 255, 247, 0, 13, 255, 247, 0, 13, 255, 224, 0, 12, 255, 224, 0, 13, 255, 247, 0, 13, 255, 224, 0, 12, 255, 246, 0, 12, 255, 246, 0, 12, 255, 246, 0, 12, 255, 246, 0, 13, 255, 247, 0, 13, 255, 224, 0, 12, 255, 224, 0, 13, 255, 225, 0, 13, 255, 224, 0, 12, 255, 246, 0, 12, 255, 246, 0, 13, 255, 247, 0, 13, 255, 247, 0, 13, 255, 246, 0, 12, 255, 246, 0, 12, 255, 246, 0, 12, 255, 246, 0, 12, 255, 224, 0, 13, 255, 224, 0, 12, 255, 224, 0, 12, 255, 224, 0, 12]);
+      // Make a buffer of on/off durations (each duration is 16 bits, off durations are negative)
+      var powerBuffer = new Buffer([0x22,0xc4,0xee,0xd0,0x2,0x58,0xfe,0xc,0x2,0x8a,0xf9,0xf2,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xf9,0xc0,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xf9,0xc0,0x2,0x8a,0xf9,0xf2,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xfe,0x3e,0x2,0x8a,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x58,0xfe,0xc,0x2,0x58,0xf9,0xc0,0x2,0x8a,0xf9,0xc0,0x2,0x58,0xf9,0xc0,0x2,0x58,0xf9,0xc0,0x2,0x58]); 
       // Send the signal at 38 kHz
       infrared.sendRawSignal(38, powerBuffer, function(err) {
         if (err) {
@@ -52,11 +52,15 @@ infrared.on('data', function(data) {
 
 ###Methods
 &#x20;<a href="#api-infrared-sendRawSignal-frequency-signalDurations-callback-The-primary-method-for-sending-data-The-first-argument-is-a-frequency-of-signal-in-Hz-typically-38-but-can-range-from-36-to-40-The-second-argument-is-a-buffer-of-unsigned-16-bit-integers-representing-the-number-of-microseconds-the-transmission-should-be-on-The-max-length-of-the-signal-durations-is-100-durations" name="api-infrared-sendRawSignal-frequency-signalDurations-callback-The-primary-method-for-sending-data-The-first-argument-is-a-frequency-of-signal-in-Hz-typically-38-but-can-range-from-36-to-40-The-second-argument-is-a-buffer-of-unsigned-16-bit-integers-representing-the-number-of-microseconds-the-transmission-should-be-on-The-max-length-of-the-signal-durations-is-100-durations">#</a> infrared<b>.sendRawSignal</b>( frequency, signalDurations, callback )  
-The primary method for sending data. The first argument is a frequency of signal in Hz, typically 38 but can range from 36 to 40. The second argument is a buffer of unsigned 16 bit integers representing the number of microseconds the transmission should be on. The max length of the signal durations is 100 durations.   
+The primary method for sending data. The first argument is a frequency of signal in Hz, typically 38 but can range from 36 to 40. The second argument is a buffer of unsigned 16 bit integers representing the number of microseconds the transmission should be on or off. On durations are positive numbers and off durations are negative numbers. The max length of the signal durations is 100 durations (200 bytes).   
 
 ###Events
 &#x20;<a href="#api-infrared-on-data-callback-data-Emitted-when-an-infrared-signal-is-detected" name="api-infrared-on-data-callback-data-Emitted-when-an-infrared-signal-is-detected">#</a> infrared<b>.on</b>( 'data', callback(data) )  
-Emitted when an infrared signal is detected.  
+
+Emitted when an infrared signal is detected. The returned data is an a buffer containing 16-bit words representing the number of microseconds a signal was on and off. For example, a buffer of <0x22,0xc4,0xee,0xd0,0x2,0x58,0xfe,0xc> represents four durations: on for 8900 uS (0x22c4), off for 4400 microseconds (0xeed0 as 2's compliment), on for 600 uS, then off for 320 microseconds.
+
+You may notice that some durations you received are occasionally off by 50 uS. That's because of the way the receiver logic is implemented. The state of a pin is checked on a 50uS timer and all of those timer ticks are multiplied by 50. If the timer is just a little bit off (or the light is reflected/transformed), it will miss the very start or end of a signal. IR detectors have a high margin of error so this usually has little effect.
+
 
 &#x20;<a href="#api-infrared-on-error-callback-err-Emitted-when-there-is-an-error-communicating-with-the-module" name="api-infrared-on-error-callback-err-Emitted-when-there-is-an-error-communicating-with-the-module">#</a> infrared<b>.on</b>( 'error', callback(err) )  
 Emitted when there is an error communicating with the module.  

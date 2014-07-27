@@ -27,8 +27,8 @@ var MAX_SIGNAL_DURATION = 200;
 
 // These should be updated with each firmware release
 var FIRMWARE_VERSION = 0x02;
-var CRC_HIGH = 0xFB;
-var CRC_LOW = 0xAA;
+var CRC_HIGH = 0x52;
+var CRC_LOW = 0x88;
 
 var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
@@ -174,13 +174,9 @@ Infrared.prototype._fetchRXDurations = function (callback) {
 
             callback && callback();
           } else {
+
             // Remove the header echoes at the beginning and stop bit
             var buf = response.slice(rxHeader.length, response.length - 1);
-
-            // Remove first two bytes of signal durations b/c they
-            // are just an indicator of how long it's been since
-            // last received data
-            buf = buf.slice(2, response.length-1);
 
             // Emit the buffer
             self.emit('data', buf);
@@ -360,20 +356,7 @@ Infrared.prototype.updateFirmware = function( fname, callback) {
   });
 };
 
-Infrared.prototype.timerAbstraction = function(buffer) {
-  // The attiny as a timer with period of 50
-  var timerTicks = 50;
 
-  /* Timings are recorded in terms of
-  50uS ticks. Multiplying by 50 will return
-  an actual duration */
-  for (var i = 0; i < buffer.length; i+=2) {
-    var raw = buffer.readInt16BE(i);
-    buffer.writeInt16BE(raw * timerTicks, i);
-  }
-
-  return buffer;
-}
 
 function use (hardware, callback) {
   return new Infrared(hardware, callback);
