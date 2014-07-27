@@ -8,4 +8,5 @@ node_modules
 *.lst
 *.map
 *.sym
-
+*.dep
+*.o

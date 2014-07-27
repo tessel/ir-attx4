@@ -10,7 +10,7 @@ infrared data.
 *********************************************/
 
 var tessel = require('tessel');
-var infraredlib = require('ir-attx4');
+var infraredlib = require('../');
 var infrared = infraredlib.use(tessel.port['A']);   // Replace '../' with 'ir-attx4' in your own code
 
 // When we're connected

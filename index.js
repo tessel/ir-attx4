@@ -22,7 +22,7 @@ var IR_RX_AVAIL_CMD = 0x03;
 var IR_RX_CMD = 0x04;
 var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
-var CRC_CMD = 0x06;
+var CRC_CMD = 0x07;
 var MAX_SIGNAL_DURATION = 200;
 
 // These should be updated with each firmware release
@@ -38,7 +38,7 @@ var Infrared = function(hardware, callback) {
   this.chipSelect = hardware.digital[0];
   this.reset = hardware.digital[1];
   this.irq = hardware.digital[2].rawWrite(false);
-  this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect});
+  this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect, chipSelectDelayUs:500});
   this.transmitting = false;
   this.listening = false;
   this.chipSelect.output(true);
@@ -315,7 +315,7 @@ Infrared.prototype._validateResponse = function (values, expected, callback) {
 };
 
 Infrared.prototype.checkForFirmwareUpdate = function(version, callback) {
-  if (version < FIRMWARE_VERSION){
+  if (version != FIRMWARE_VERSION){
     console.log('New IR module firmware available - updating...');
     this.updateFirmware( FIRMWARE_FILE, callback);
   }
@@ -339,8 +339,7 @@ Infrared.prototype.readFirmwareCRC = function(retries, callback) {
       if (retries > 0){
         self.readFirmwareCRC(retries, callback);
       } else {
-        // self.updateFirmware(FIRMWARE_FILE, callback);
-        console.log('bad crc');
+        self.updateFirmware(FIRMWARE_FILE, callback);
       }
     }
   });
