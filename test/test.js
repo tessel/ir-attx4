@@ -32,7 +32,7 @@ async.series([
     // Cancelled by the ready event
     var timeout = setTimeout(function eventNotCalled() {
       t.fail("Ready event never fired on module 2 connection.");
-    }, 10000);
+    }, 30000);
 
     // Connect to the port
     infrared2 = infraredLib.use(tessel.port[portName2]);
