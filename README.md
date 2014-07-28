@@ -3,6 +3,8 @@ Driver for the ir-attx4 Tessel infrared module. The hardware documentation for t
 
 If you run into any issues you can ask for support on the [IR Module Forums](http://forums.tessel.io/category/ir).
 
+Note: This library is responsible for sending and receiving IR data but we've just started another library, [ir-codes](github.com/technicalmachine/ir-codes), to generate and parse IR signals from different manufacturers. It's currently missing most manufacturers so we encourage developers to help us build out that library.
+
 ###Installation
 ```sh
 npm install ir-attx4
