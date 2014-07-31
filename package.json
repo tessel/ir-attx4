@@ -16,7 +16,8 @@
   "author": "",
   "license": "MIT/Apache 2.0",
   "dependencies": {
-    "avr-isp": "0.0.1",
+    "attiny-common" : "~0.0.1",
+    "avr-isp": "~0.0.2",
     "sync-queue" : "0.0.1"
     },
   "devDependencies": {

@@ -10,6 +10,9 @@
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
 var firmware = require('./lib/firmware');
+var Attiny = require('attiny-common');
+var MODULE_ID = 0x08;
+var TINY84_SIGNATURE = 0x930C;
 
 var PACKET_CONF = 0x55;
 var ACK_CONF = 0x33;
@@ -34,6 +37,72 @@ var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
 var Infrared = function(hardware, callback) {
 
+  var self = this;
+
+  // Create a new tiny agent
+  this.attiny = new Attiny(hardware);
+
+  // Store our firmware checking and updating options
+  var firmwareOptions = {
+    firmwareFile : FIRMWARE_FILE,
+    firmwareVersion : FIRMWARE_VERSION,
+    moduleID : MODULE_ID,
+    signature : TINY84_SIGNATURE,
+    crc : (CRC_HIGH << 8) | CRC_LOW,
+  }
+
+  // Initialize (check firmware version, update as necessary)
+  this.attiny.initialize(firmwareOptions, function(err) {
+    console.log('done initializing!', err);
+    if (err) {
+      self.emit('error', err);
+
+      if (callback) callback(err);
+
+      return;
+    }
+
+    else {
+
+      // TODO: Setup IRQ Handler
+      // self.attiny.setIRQCallback(function(self._IRQHandler.bind(self)));
+
+      // // If we get a new listener
+      // this.on('newListener', function (event) {
+      //   // And they are listening for rx data and we haven't been yet
+      //   if (event == 'data' && !this.listeners(event).length) {
+      //     self._setListening(1);
+      //   }
+      // });
+
+      // this.on('removeListener', function (event) {
+      //   // If this was for the rx data event and there aren't any more listeners
+      //   if (event == 'data' && !this.listeners(event).length) {
+      //     self._setListening(0);
+      //   }
+      // });
+
+      // self.connected = true;
+
+      // setImmediate(function () {
+      //   // Emit a ready event
+      //   self.emit('ready');
+      //   // Start listening for IRQ interrupts
+      //   self.irq.once('high', self._IRQHandler.bind(self));
+      // });
+
+      // // Make sure we aren't gathering rx data until someone is listening.
+      // var listening = self.listeners('data').length ? true : false;
+
+      // self._setListening(listening, function listeningSet(err) {
+      //   // Complete the setup
+      //   if (callback) {
+      //     callback(err, self); 
+      //   }
+      // });
+    }
+  });
+
   this.hardware = hardware;
   this.chipSelect = hardware.digital[0];
   this.reset = hardware.digital[1];
@@ -46,61 +115,48 @@ var Infrared = function(hardware, callback) {
 
   var self = this;
 
-  // If we get a new listener
-  this.on('newListener', function (event) {
-    // And they are listening for rx data and we haven't been yet
-    if (event == 'data' && !this.listeners(event).length) {
-      self._setListening(1);
-    }
-  });
 
-  this.on('removeListener', function (event) {
-    // If this was for the rx data event and there aren't any more listeners
-    if (event == 'data' && !this.listeners(event).length) {
-      self._setListening(0);
-    }
-  });
 
-  var emitError = function(err) {
-    setImmediate(function () {
-      // Emit an error event
-      self.emit('error', err);
-    });
-  }
+  // var emitError = function(err) {
+  //   setImmediate(function () {
+  //     // Emit an error event
+  //     self.emit('error', err);
+  //   });
+  // }
 
-  // Make sure we can communicate with the module
-  this._establishCommunication(3, function (err, version) {
-    if (err) {
-      emitError(err);
-    } 
-    else {
-      self.checkForFirmwareUpdate(version, function afterUpdate(err) {
-        if (err) {
-          emitError(err);
-        } 
-        else {
-          self.connected = true;
+  // // Make sure we can communicate with the module
+  // this._establishCommunication(3, function (err, version) {
+  //   if (err) {
+  //     emitError(err);
+  //   } 
+  //   else {
+  //     self.checkForFirmwareUpdate(version, function afterUpdate(err) {
+  //       if (err) {
+  //         emitError(err);
+  //       } 
+  //       else {
+  //         self.connected = true;
 
-          setImmediate(function () {
-            // Emit a ready event
-            self.emit('ready');
-            // Start listening for IRQ interrupts
-            self.irq.once('high', self._IRQHandler.bind(self));
-          });
+  //         setImmediate(function () {
+  //           // Emit a ready event
+  //           self.emit('ready');
+  //           // Start listening for IRQ interrupts
+  //           self.irq.once('high', self._IRQHandler.bind(self));
+  //         });
 
-          // Make sure we aren't gathering rx data until someone is listening.
-          var listening = self.listeners('data').length ? true : false;
+  //         // Make sure we aren't gathering rx data until someone is listening.
+  //         var listening = self.listeners('data').length ? true : false;
 
-          self._setListening(listening, function listeningSet(err) {
-            // Complete the setup
-            if (callback) {
-              callback(err, self); 
-            }
-          });
-        }
-      });
-    } 
-  });
+  //         self._setListening(listening, function listeningSet(err) {
+  //           // Complete the setup
+  //           if (callback) {
+  //             callback(err, self); 
+  //           }
+  //         });
+  //       }
+  //     });
+  //   } 
+  // });
 };
 
 util.inherits(Infrared, EventEmitter);
