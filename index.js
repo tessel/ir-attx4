@@ -13,27 +13,27 @@ var firmware = require('./lib/firmware');
 var Attiny = require('attiny-common');
 var MODULE_ID = 0x08;
 var TINY84_SIGNATURE = 0x930C;
+var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
+// Confirmation Signals
 var PACKET_CONF = 0x55;
 var ACK_CONF = 0x33;
 var FIN_CONF = 0x16;
 
-var ACK_CMD = 0x00;
-var FIRMWARE_CMD = 0x01;
+// Available commands
 var IR_TX_CMD = 0x02;
 var IR_RX_AVAIL_CMD = 0x03;
 var IR_RX_CMD = 0x04;
 var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
 var CRC_CMD = 0x07;
+
+// Module specific defines
 var MAX_SIGNAL_DURATION = 200;
 
-// These should be updated with each firmware release
+// Firmware release info. Updated with each release
 var FIRMWARE_VERSION = 0x03;
-var CRC_HIGH = 0x15;
-var CRC_LOW = 0xC9;
-
-var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
+var CRC = 13777;
 
 var Infrared = function(hardware, callback) {
 
@@ -48,7 +48,7 @@ var Infrared = function(hardware, callback) {
     firmwareVersion : FIRMWARE_VERSION,
     moduleID : MODULE_ID,
     signature : TINY84_SIGNATURE,
-    crc : (CRC_HIGH << 8) | CRC_LOW,
+    crc : CRC,
   }
 
   // Initialize (check firmware version, update as necessary)
