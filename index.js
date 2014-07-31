@@ -29,9 +29,9 @@ var CRC_CMD = 0x07;
 var MAX_SIGNAL_DURATION = 200;
 
 // These should be updated with each firmware release
-var FIRMWARE_VERSION = 0x02;
-var CRC_HIGH = 0x52;
-var CRC_LOW = 0x88;
+var FIRMWARE_VERSION = 0x03;
+var CRC_HIGH = 0x15;
+var CRC_LOW = 0xC9;
 
 var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
@@ -244,14 +244,6 @@ Infrared.prototype._fetchRXDurations = function (callback) {
   });
 };
 
-function updateFirmware(hardware, fname, callback) {
-  var self = this;
-  console.warn('updating firmware');
-  firmware.update( hardware, fname, function(){
-    callback && callback();
-  });
-}
-
 Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callback) {
   if (frequency <= 0) {
     callback && callback(new Error("Invalid frequency. Must be greater than zero. Works best between 36-40."));
@@ -313,105 +305,8 @@ Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
 
   return new Buffer(tx);
 };
-
-Infrared.prototype._establishCommunication = function (retries, callback){
-  var self = this;
-  // Grab the firmware version
-  self.getFirmwareVersion(function (err, version) {
-    // If it didn't work
-    if (err) {
-      // Subtract number of retries
-      retries--;
-      // If there are no more retries possible
-      if (!retries) {
-        // Throw an error and return
-        return callback && callback(new Error("Can't connect with module..."));
-      }
-      // Else call recursively
-      else {
-        self._establishCommunication(retries, callback);
-      }
-    } else {
-      // Connected successfully
-      self.connected = true;
-      // Call callback with version
-      callback && callback(null, version);
-    }
-  });
-};  
-
-Infrared.prototype.getFirmwareVersion = function (callback) {
-  var self = this;
-
-  self.spi.transfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function spiComplete (err, response) {
-    if (err) {
-      return callback(err, null);
-    } else if (self._validateResponse(response, [false, FIRMWARE_CMD]) && response.length === 3)  {
-      callback && callback(null, response[2]);
-    } else {
-      callback && callback(new Error("Error retrieving Firmware Version"));
-    }
-  });
-};    
-
-Infrared.prototype._validateResponse = function (values, expected, callback) {
-  var res = true;
-  for (var index = 0; index < expected.length; index++) {
-    if (expected[index] == false) {
-      continue;
-    }
-    if (expected[index] != values[index]) {
-      res = false;
-      break;
-    }
-  }
-
-  callback && callback(res);
-  return res;
-};
-
-Infrared.prototype.checkForFirmwareUpdate = function(version, callback) {
-  if (version != FIRMWARE_VERSION){
-    console.log('New IR module firmware available - updating...');
-    this.updateFirmware( FIRMWARE_FILE, callback);
-  }
-  else {
-    if (callback)
-      callback();
-  }
-}
-
-Infrared.prototype.readFirmwareCRC = function(retries, callback) {
-  var self = this;
-  self.spi.transfer(new Buffer([CRC_CMD, 0x00, 0x00, 0x00]), function gotCRC(err, res){
-    if (err) {
-      return callback(err);
-    } else if (self._validateResponse(res, [false, CRC_CMD, CRC_HIGH, CRC_LOW]) && res.length === 4) {
-      if (callback) {
-        callback(null);
-      }
-    } else {
-      retries--;
-      if (retries > 0){
-        self.readFirmwareCRC(retries, callback);
-      } else {
-        self.updateFirmware(FIRMWARE_FILE, callback);
-      }
-    }
-  });
-};
-
-Infrared.prototype.updateFirmware = function( fname, callback) {
-  var self = this;
-
-  firmware.update(self.hardware, fname, function(){
-    setTimeout( function(){
-      self.readFirmwareCRC(5, callback);
-    }, 500);
-  });
-};
-
-
+ 
+  
 
 function use (hardware, callback) {
   return new Infrared(hardware, callback);

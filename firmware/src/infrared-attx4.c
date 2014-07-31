@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#include "infrared-attx4.h"
+#include "../include/infrared-attx4.h"
 
 volatile receiver_t receiver;
 volatile transmitter_t transmitter;
@@ -56,7 +56,7 @@ main: The primary loop for transmitting.
 int main(void) {
 
   // Set the checksum
-  checksum = crc16( (unsigned short) _exit << 1 );
+  checksum = calculate_checksum( (unsigned short) _exit << 1 );
 
   // Get everything all configured
   initializeIR();
@@ -578,7 +578,13 @@ ISR(INT0_vect, ISR_NOBLOCK) {  //nested interrupts, aka stacks on stacks of inte
   // If they want firmware version
   case FIRMWARE_CMD:
     // Send the firmware version
-    spiX_put(FIRMWARE_VERSION); 
+    spiX_put(read_firmware_version()); 
+    spiX_wait();
+    break;
+  // If they want firmware version
+  case MODULE_ID_CMD:
+    // Send the firmware version
+    spiX_put(read_module_id()); 
     spiX_wait();
     break;
 
@@ -765,31 +771,4 @@ readIR_RX: Read current state of chip select
 **************************************/
 uint8_t readCS(void) {
   return PINB & (1 << CS);
-}
-
-unsigned short crc16( unsigned short length)
-{
-  unsigned char i;
-  unsigned int data;
-  unsigned int crc = 0xffff;
-  char *data_p = 0x0000;
-
-  if (length == 0)
-        return (~crc);
-  do
-  {
-        for (i=0, data= pgm_read_byte(data_p++);
-             i < 8;
-             i++, data >>= 1)
-        {
-              if ((crc & 0x0001) ^ (data & 0x0001))
-                    crc = (crc >> 1) ^ POLY;
-              else  crc >>= 1;
-        }
-  } while (--length);
-  crc = ~crc;
-  data = crc;
-  crc = (crc << 8) | (data >> 8 & 0xff);
-
-  return (crc);
 }
