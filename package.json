@@ -16,11 +16,11 @@
   "author": "",
   "license": "MIT/Apache 2.0",
   "dependencies": {
-    "attiny-common" : "~0.0.1",
-    "sync-queue" : "0.0.1"
+    "attiny-common" : "^0.0.1",
+    "sync-queue" : "^0.0.1"
     },
   "devDependencies": {
     "tinytap": "^0.2.0",
-    "async" : "~0.9.0"
+    "async" : "^0.9.0"
   }
 }
