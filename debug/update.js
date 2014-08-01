@@ -11,7 +11,7 @@ var firmwareOptions = {
   crc : 13777,
 }
 
-// Initialize an IR module and flash it (only the IR module can calculate its CRC?)
+// Force an update
 attiny.updateFirmware(firmwareOptions, function(err) {
   if (err) {
     throw err
