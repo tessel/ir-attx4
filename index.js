@@ -9,7 +9,6 @@
 
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
-var firmware = require('./lib/firmware');
 var Attiny = require('attiny-common');
 var MODULE_ID = 0x08;
 var TINY84_SIGNATURE = 0x930C;
@@ -267,4 +266,3 @@ function use (hardware, callback) {
 
 exports.Infrared = Infrared;
 exports.use = use;
-exports.updateFirmware = updateFirmware;
