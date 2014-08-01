@@ -9,11 +9,8 @@
 
 #include <avr/interrupt.h> // Supplied Interrupt Macros
 #include <avr/wdt.h> // Supplied Watch Dog Timer Macros 
-#include "spi_via_usi_driver.c" // Supplied SPI Driver
-#include <avr/pgmspace.h> // Used for getting the CRC
-
-// For CRC calculation
-#define POLY 0x8408
+#include "src/deps/avr-usi-spi/spi_via_usi_driver.c" // Supplied SPI Driver
+#include "src/deps/attiny-firmware-common/include/common.h" // Common libs between attiny repos
 
 #define USECPERTICK 50  // microseconds per clock interrupt tick
 #define SYSCLOCK 8000000  // attiny clock
@@ -43,9 +40,6 @@
 #define ACK_CODE  0x33
 #define FIN_CODE 0x16
 
-// Firmware version to increment
-#define FIRMWARE_VERSION 0x02
-
 // Available commands
 #define ACK_CMD 0
 #define FIRMWARE_CMD 1
@@ -55,6 +49,7 @@
 #define START_RX_CMD 5
 #define STOP_RX_CMD 6
 #define CRC_CMD 7
+#define MODULE_ID_CMD 8
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -93,5 +88,3 @@ transmitter_t;
 
 extern volatile receiver_t receiver;
 extern volatile transmitter_t transmitter;
-
-unsigned short crc16( unsigned short length);

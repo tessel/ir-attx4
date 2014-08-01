@@ -9,110 +9,113 @@
 
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
-var firmware = require('./lib/firmware');
+var Attiny = require('attiny-common');
+var MODULE_ID = 0x0B;
+var TINY84_SIGNATURE = 0x930C;
+var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
+// Confirmation Signals
 var PACKET_CONF = 0x55;
 var ACK_CONF = 0x33;
 var FIN_CONF = 0x16;
 
-var ACK_CMD = 0x00;
-var FIRMWARE_CMD = 0x01;
+// Available commands
 var IR_TX_CMD = 0x02;
 var IR_RX_AVAIL_CMD = 0x03;
 var IR_RX_CMD = 0x04;
 var RX_START_CMD = 0x05;
 var RX_STOP_CMD = 0x06;
 var CRC_CMD = 0x07;
+
+// Module specific defines
 var MAX_SIGNAL_DURATION = 200;
 
-// These should be updated with each firmware release
-var FIRMWARE_VERSION = 0x02;
-var CRC_HIGH = 0x52;
-var CRC_LOW = 0x88;
-
-var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
+// Firmware release info. Updated with each release
+var FIRMWARE_VERSION = 0x03;
+var CRC = 13777;
 
 var Infrared = function(hardware, callback) {
 
-  this.hardware = hardware;
-  this.chipSelect = hardware.digital[0];
-  this.reset = hardware.digital[1];
-  this.irq = hardware.digital[2].rawWrite(false);
-  this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect, chipSelectDelayUs:500});
-  this.transmitting = false;
-  this.listening = false;
-  this.chipSelect.output(true);
-  this.reset.output(true);
-
   var self = this;
 
-  // If we get a new listener
-  this.on('newListener', function (event) {
-    // And they are listening for rx data and we haven't been yet
-    if (event == 'data' && !this.listeners(event).length) {
-      self._setListening(1);
-    }
-  });
+  // Create a new tiny agent
+  this.attiny = new Attiny(hardware);
 
-  this.on('removeListener', function (event) {
-    // If this was for the rx data event and there aren't any more listeners
-    if (event == 'data' && !this.listeners(event).length) {
-      self._setListening(0);
-    }
-  });
-
-  var emitError = function(err) {
-    setImmediate(function () {
-      // Emit an error event
-      self.emit('error', err);
-    });
+  // Store our firmware checking and updating options
+  var firmwareOptions = {
+    firmwareFile : FIRMWARE_FILE,
+    firmwareVersion : FIRMWARE_VERSION,
+    moduleID : MODULE_ID,
+    signature : TINY84_SIGNATURE,
+    crc : CRC,
   }
 
-  // Make sure we can communicate with the module
-  this._establishCommunication(3, function (err, version) {
+  // Initialize (check firmware version, update as necessary)
+  this.attiny.initialize(firmwareOptions, function(err) {
+
+    // If there was an error
     if (err) {
-      emitError(err);
-    } 
+      // Emit it
+      self.emit('error', err);
+      // Call the callback
+      if (callback) callback(err);
+      // Abort
+      return;
+    }
+    // There was no error
     else {
-      self.checkForFirmwareUpdate(version, function afterUpdate(err) {
-        if (err) {
-          emitError(err);
-        } 
-        else {
-          self.connected = true;
 
-          setImmediate(function () {
-            // Emit a ready event
-            self.emit('ready');
-            // Start listening for IRQ interrupts
-            self.irq.once('high', self._IRQHandler.bind(self));
-          });
+      self.connected = true;
 
-          // Make sure we aren't gathering rx data until someone is listening.
-          var listening = self.listeners('data').length ? true : false;
-
-          self._setListening(listening, function listeningSet(err) {
-            // Complete the setup
-            if (callback) {
-              callback(err, self); 
-            }
-          });
+      // If we get a new listener
+      self.on('newListener', function (event) {
+        // And they are listening for rx data and we haven't been yet
+        if (event == 'data' && !this.listeners(event).length) {
+          // Enable GPIO Interrupts on IRQ
+          self._setListening(1);
         }
       });
-    } 
+
+      // Someone stopped listening
+      self.on('removeListener', function (event) {
+        // If this was for the rx data event and there aren't any more listeners
+        if (event == 'data' && !this.listeners(event).length) {
+          // Disable gpio interrupts on IRQ
+          self._setListening(0);
+        }
+      });
+
+      setImmediate(function () {
+        // Emit a ready event
+        self.emit('ready');
+        // Start listening for IRQ interrupts
+        self.attiny.setIRQCallback(self._IRQHandler.bind(self));
+
+      });
+
+      // Make sure we aren't gathering rx data until someone is listening.
+      var listening = self.listeners('data').length ? true : false;
+
+      self._setListening(listening, function listeningSet(err) {
+        // Complete the setup
+        if (callback) {
+          callback(err, self); 
+        }
+      });
+    }
   });
 };
 
 util.inherits(Infrared, EventEmitter);
 
-Infrared.prototype._IRQHandler = function () {
+Infrared.prototype._IRQHandler = function (callback) {
   var self = this;
   // If we are not in the middle of transmitting
   if (!self.transmitting) {
     // Receive the durations
     self._fetchRXDurations(function fetched () {
       // Start listening for IRQ interrupts again
-      self.irq.once('high', self._IRQHandler.bind(self));
+      self.attiny.setIRQCallback(self._IRQHandler.bind(self));
     });
   } else {
     // If we are, check back in a little bit
@@ -124,8 +127,8 @@ Infrared.prototype._setListening = function (set, callback) {
   var self = this;
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
-  self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
-    self._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
+  self.attiny.transceive(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
+    self.attiny._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
       if (!valid) {
         callback && callback(new Error("Invalid response on setting rx on/off."));
       } else {
@@ -133,12 +136,12 @@ Infrared.prototype._setListening = function (set, callback) {
         // If we aren't listening any more
         if (!self.listening) {
           // Remove this GPIO interrupt
-          self.irq.removeAllListeners();
+          self.attiny.irq.removeAllListeners();
         }
         else {
           // Make sure it calls the IRQ handler
-          if (!self.irq.listeners('high').length) {
-            self.irq.once('high', self._IRQHandler.bind(self));
+          if (!self.attiny.irq.listeners('high').length) {
+            self.attiny.irq.once('high', self._IRQHandler.bind(self));
           }
         }
         callback && callback();
@@ -150,10 +153,10 @@ Infrared.prototype._setListening = function (set, callback) {
 Infrared.prototype._fetchRXDurations = function (callback) {
   var self = this;
   // We have to pull chip select high in case we were in the middle of something else
-  self.spi.transfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete (err, response) {
+  self.attiny.transceive(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete (err, response) {
     // DO something smarter than this eventually
 
-    self._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function (valid) {
+    self.attiny._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function (valid) {
       if (valid) {
         var numInt16 = response[3];
 
@@ -166,7 +169,7 @@ Infrared.prototype._fetchRXDurations = function (callback) {
         // Push the stop bit on there.
         packet.push(FIN_CONF);
 
-        self.spi.transfer(new Buffer(packet), function spiComplete (err, response) {
+        self.attiny.transceive(new Buffer(packet), function spiComplete (err, response) {
           var fin = response[response.length - 1];
 
           if (fin != FIN_CONF) {
@@ -188,14 +191,6 @@ Infrared.prototype._fetchRXDurations = function (callback) {
   });
 };
 
-function updateFirmware(hardware, fname, callback) {
-  var self = this;
-  console.warn('updating firmware');
-  firmware.update( hardware, fname, function(){
-    callback && callback();
-  });
-}
-
 Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callback) {
   if (frequency <= 0) {
     callback && callback(new Error("Invalid frequency. Must be greater than zero. Works best between 36-40."));
@@ -214,18 +209,19 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
   }
 
   this.transmitting = true;
+
   var self = this;
 
   // Make the packet
   var tx = this._constructTXPacket(frequency, signalDurations);
 
   // Send it over
-  this.spi.transfer(tx, function spiComplete (err, response) {
+  this.attiny.transceive(tx, function spiComplete (err, response) {
     self.transmitting = false;
 
     // If there was an error already, set immediate on the callback
     var err = null;
-    if (!self._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
+    if (!self.attiny._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
       err = new Error("Invalid response from raw signal packet.");
     }
     
@@ -257,105 +253,8 @@ Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
 
   return new Buffer(tx);
 };
-
-Infrared.prototype._establishCommunication = function (retries, callback){
-  var self = this;
-  // Grab the firmware version
-  self.getFirmwareVersion(function (err, version) {
-    // If it didn't work
-    if (err) {
-      // Subtract number of retries
-      retries--;
-      // If there are no more retries possible
-      if (!retries) {
-        // Throw an error and return
-        return callback && callback(new Error("Can't connect with module..."));
-      }
-      // Else call recursively
-      else {
-        self._establishCommunication(retries, callback);
-      }
-    } else {
-      // Connected successfully
-      self.connected = true;
-      // Call callback with version
-      callback && callback(null, version);
-    }
-  });
-};  
-
-Infrared.prototype.getFirmwareVersion = function (callback) {
-  var self = this;
-
-  self.spi.transfer(new Buffer([FIRMWARE_CMD, 0x00, 0x00]), function spiComplete (err, response) {
-    if (err) {
-      return callback(err, null);
-    } else if (self._validateResponse(response, [false, FIRMWARE_CMD]) && response.length === 3)  {
-      callback && callback(null, response[2]);
-    } else {
-      callback && callback(new Error("Error retrieving Firmware Version"));
-    }
-  });
-};    
-
-Infrared.prototype._validateResponse = function (values, expected, callback) {
-  var res = true;
-  for (var index = 0; index < expected.length; index++) {
-    if (expected[index] == false) {
-      continue;
-    }
-    if (expected[index] != values[index]) {
-      res = false;
-      break;
-    }
-  }
-
-  callback && callback(res);
-  return res;
-};
-
-Infrared.prototype.checkForFirmwareUpdate = function(version, callback) {
-  if (version != FIRMWARE_VERSION){
-    console.log('New IR module firmware available - updating...');
-    this.updateFirmware( FIRMWARE_FILE, callback);
-  }
-  else {
-    if (callback)
-      callback();
-  }
-}
-
-Infrared.prototype.readFirmwareCRC = function(retries, callback) {
-  var self = this;
-  self.spi.transfer(new Buffer([CRC_CMD, 0x00, 0x00, 0x00]), function gotCRC(err, res){
-    if (err) {
-      return callback(err);
-    } else if (self._validateResponse(res, [false, CRC_CMD, CRC_HIGH, CRC_LOW]) && res.length === 4) {
-      if (callback) {
-        callback(null);
-      }
-    } else {
-      retries--;
-      if (retries > 0){
-        self.readFirmwareCRC(retries, callback);
-      } else {
-        self.updateFirmware(FIRMWARE_FILE, callback);
-      }
-    }
-  });
-};
-
-Infrared.prototype.updateFirmware = function( fname, callback) {
-  var self = this;
-
-  firmware.update(self.hardware, fname, function(){
-    setTimeout( function(){
-      self.readFirmwareCRC(5, callback);
-    }, 500);
-  });
-};
-
-
+ 
+  
 
 function use (hardware, callback) {
   return new Infrared(hardware, callback);
@@ -367,4 +266,3 @@ function use (hardware, callback) {
 
 exports.Infrared = Infrared;
 exports.use = use;
-exports.updateFirmware = updateFirmware;
