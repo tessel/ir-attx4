@@ -53,122 +53,70 @@ var Infrared = function(hardware, callback) {
 
   // Initialize (check firmware version, update as necessary)
   this.attiny.initialize(firmwareOptions, function(err) {
-    console.log('done initializing!', err);
+
+    // If there was an error
     if (err) {
+      // Emit it
       self.emit('error', err);
-
+      // Call the callback
       if (callback) callback(err);
-
+      // Abort
       return;
     }
-
+    // There was no error
     else {
 
-      // TODO: Setup IRQ Handler
-      // self.attiny.setIRQCallback(function(self._IRQHandler.bind(self)));
+      self.connected = true;
 
-      // // If we get a new listener
-      // this.on('newListener', function (event) {
-      //   // And they are listening for rx data and we haven't been yet
-      //   if (event == 'data' && !this.listeners(event).length) {
-      //     self._setListening(1);
-      //   }
-      // });
+      // If we get a new listener
+      self.on('newListener', function (event) {
+        // And they are listening for rx data and we haven't been yet
+        if (event == 'data' && !this.listeners(event).length) {
+          // Enable GPIO Interrupts on IRQ
+          self._setListening(1);
+        }
+      });
 
-      // this.on('removeListener', function (event) {
-      //   // If this was for the rx data event and there aren't any more listeners
-      //   if (event == 'data' && !this.listeners(event).length) {
-      //     self._setListening(0);
-      //   }
-      // });
+      // Someone stopped listening
+      self.on('removeListener', function (event) {
+        // If this was for the rx data event and there aren't any more listeners
+        if (event == 'data' && !this.listeners(event).length) {
+          // Disable gpio interrupts on IRQ
+          self._setListening(0);
+        }
+      });
 
-      // self.connected = true;
+      setImmediate(function () {
+        // Emit a ready event
+        self.emit('ready');
+        // Start listening for IRQ interrupts
+        self.attiny.setIRQCallback(self._IRQHandler.bind(self));
 
-      // setImmediate(function () {
-      //   // Emit a ready event
-      //   self.emit('ready');
-      //   // Start listening for IRQ interrupts
-      //   self.irq.once('high', self._IRQHandler.bind(self));
-      // });
+      });
 
-      // // Make sure we aren't gathering rx data until someone is listening.
-      // var listening = self.listeners('data').length ? true : false;
+      // Make sure we aren't gathering rx data until someone is listening.
+      var listening = self.listeners('data').length ? true : false;
 
-      // self._setListening(listening, function listeningSet(err) {
-      //   // Complete the setup
-      //   if (callback) {
-      //     callback(err, self); 
-      //   }
-      // });
+      self._setListening(listening, function listeningSet(err) {
+        // Complete the setup
+        if (callback) {
+          callback(err, self); 
+        }
+      });
     }
   });
-
-  this.hardware = hardware;
-  this.chipSelect = hardware.digital[0];
-  this.reset = hardware.digital[1];
-  this.irq = hardware.digital[2].rawWrite(false);
-  this.spi = hardware.SPI({clockSpeed : 1000, mode:2, chipSelect:this.chipSelect, chipSelectDelayUs:500});
-  this.transmitting = false;
-  this.listening = false;
-  this.chipSelect.output(true);
-  this.reset.output(true);
-
-  var self = this;
-
-
-
-  // var emitError = function(err) {
-  //   setImmediate(function () {
-  //     // Emit an error event
-  //     self.emit('error', err);
-  //   });
-  // }
-
-  // // Make sure we can communicate with the module
-  // this._establishCommunication(3, function (err, version) {
-  //   if (err) {
-  //     emitError(err);
-  //   } 
-  //   else {
-  //     self.checkForFirmwareUpdate(version, function afterUpdate(err) {
-  //       if (err) {
-  //         emitError(err);
-  //       } 
-  //       else {
-  //         self.connected = true;
-
-  //         setImmediate(function () {
-  //           // Emit a ready event
-  //           self.emit('ready');
-  //           // Start listening for IRQ interrupts
-  //           self.irq.once('high', self._IRQHandler.bind(self));
-  //         });
-
-  //         // Make sure we aren't gathering rx data until someone is listening.
-  //         var listening = self.listeners('data').length ? true : false;
-
-  //         self._setListening(listening, function listeningSet(err) {
-  //           // Complete the setup
-  //           if (callback) {
-  //             callback(err, self); 
-  //           }
-  //         });
-  //       }
-  //     });
-  //   } 
-  // });
 };
 
 util.inherits(Infrared, EventEmitter);
 
-Infrared.prototype._IRQHandler = function () {
+Infrared.prototype._IRQHandler = function (callback) {
   var self = this;
   // If we are not in the middle of transmitting
   if (!self.transmitting) {
     // Receive the durations
     self._fetchRXDurations(function fetched () {
       // Start listening for IRQ interrupts again
-      self.irq.once('high', self._IRQHandler.bind(self));
+      self.attiny.setIRQCallback(self._IRQHandler.bind(self));
     });
   } else {
     // If we are, check back in a little bit
@@ -180,8 +128,8 @@ Infrared.prototype._setListening = function (set, callback) {
   var self = this;
 
   var cmd = set ? RX_START_CMD : RX_STOP_CMD;
-  self.spi.transfer(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
-    self._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
+  self.attiny.transceive(new Buffer([cmd, 0x00, 0x00]), function listeningSet (err, response) {
+    self.attiny._validateResponse(response, [PACKET_CONF, cmd], function (valid) {
       if (!valid) {
         callback && callback(new Error("Invalid response on setting rx on/off."));
       } else {
@@ -189,12 +137,12 @@ Infrared.prototype._setListening = function (set, callback) {
         // If we aren't listening any more
         if (!self.listening) {
           // Remove this GPIO interrupt
-          self.irq.removeAllListeners();
+          self.attiny.irq.removeAllListeners();
         }
         else {
           // Make sure it calls the IRQ handler
-          if (!self.irq.listeners('high').length) {
-            self.irq.once('high', self._IRQHandler.bind(self));
+          if (!self.attiny.irq.listeners('high').length) {
+            self.attiny.irq.once('high', self._IRQHandler.bind(self));
           }
         }
         callback && callback();
@@ -206,10 +154,10 @@ Infrared.prototype._setListening = function (set, callback) {
 Infrared.prototype._fetchRXDurations = function (callback) {
   var self = this;
   // We have to pull chip select high in case we were in the middle of something else
-  self.spi.transfer(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete (err, response) {
+  self.attiny.transceive(new Buffer([IR_RX_AVAIL_CMD, 0x00, 0x00, 0x00]), function spiComplete (err, response) {
     // DO something smarter than this eventually
 
-    self._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function (valid) {
+    self.attiny._validateResponse(response, [PACKET_CONF, IR_RX_AVAIL_CMD, 1], function (valid) {
       if (valid) {
         var numInt16 = response[3];
 
@@ -222,7 +170,7 @@ Infrared.prototype._fetchRXDurations = function (callback) {
         // Push the stop bit on there.
         packet.push(FIN_CONF);
 
-        self.spi.transfer(new Buffer(packet), function spiComplete (err, response) {
+        self.attiny.transceive(new Buffer(packet), function spiComplete (err, response) {
           var fin = response[response.length - 1];
 
           if (fin != FIN_CONF) {
@@ -262,18 +210,19 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
   }
 
   this.transmitting = true;
+
   var self = this;
 
   // Make the packet
   var tx = this._constructTXPacket(frequency, signalDurations);
 
   // Send it over
-  this.spi.transfer(tx, function spiComplete (err, response) {
+  this.attiny.transceive(tx, function spiComplete (err, response) {
     self.transmitting = false;
 
     // If there was an error already, set immediate on the callback
     var err = null;
-    if (!self._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
+    if (!self.attiny._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
       err = new Error("Invalid response from raw signal packet.");
     }
     

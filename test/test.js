@@ -84,14 +84,14 @@ async.series([
 
     setImmediate(function() {
       // If infrared1 gets data
-      infrared1.irq.once('high', function testFailed() {
+      infrared1.attiny.irq.once('high', function testFailed() {
         t.fail("removing listeners doesn't stop it from picking up data");
       });
 
       // Set a timeout that gets called to pass this test
       var timeout = setTimeout(function testPassed() {
         infrared1.removeAllListeners('data');
-        infrared1.irq.removeAllListeners('high');
+        infrared1.attiny.irq.removeAllListeners('high');
         t.end();
       }, 1000);
 
