@@ -6,7 +6,7 @@ var attiny = new Attiny(tessel.port['A']);
 var firmwareOptions = {
   firmwareFile : 'firmware/src/infrared-attx4.hex',
   firmwareVersion : 3,
-  moduleID : 0x08,
+  moduleID : 0x0B,
   signature : 0x930C,
   crc : 13777,
 }

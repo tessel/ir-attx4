@@ -10,7 +10,7 @@
 var util = require('util');
 var EventEmitter = require('events').EventEmitter;
 var Attiny = require('attiny-common');
-var MODULE_ID = 0x08;
+var MODULE_ID = 0x0B;
 var TINY84_SIGNATURE = 0x930C;
 var FIRMWARE_FILE = 'firmware/src/infrared-attx4.hex';
 
