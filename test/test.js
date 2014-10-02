@@ -142,10 +142,15 @@ async.series([
       t.equal(data.length, testSignal.length, 'received and sent signals are different lengths.');
 
       // Test that all of the bytes are the same
+      var numLrg = 0;
       for (var i = 0; i < data.length; i++) {
         if (Math.abs(data[i] - testSignal[i] > 50)) {
-          t.fail('received and sent signals have different payloads.');
+          numLrg++;
         }
+      }
+
+      if (numLrg > 3) {
+        t.fail('received and sent signals have payloads differing beyond the expectations of normal interference: ' + numLrg);
       }
 
       t.end();
