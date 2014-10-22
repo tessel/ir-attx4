@@ -31,8 +31,8 @@ var CRC_CMD = 0x07;
 var MAX_SIGNAL_DURATION = 200;
 
 // Firmware release info. Updated with each release
-var FIRMWARE_VERSION = 0x03;
-var CRC = 13777;
+var FIRMWARE_VERSION = 0x04;
+var CRC = 47355;
 
 var Infrared = function(hardware, callback) {
 
@@ -186,6 +186,15 @@ Infrared.prototype._fetchRXDurations = function (callback) {
             callback && callback();
           }
         });
+      }
+      else {
+        if (callback) {
+          var err = new Error("Invalid response when checking if data was available to read");
+          setImmediate(function() {
+            self.emit('error', err);
+          });
+          callback(err);
+        }
       }
     });
   });

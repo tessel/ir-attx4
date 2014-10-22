@@ -443,10 +443,12 @@ ISR(TIM1_COMPA_vect)
   // One more 50us tick
   receiver.timer++; 
 
-  // If our receive length is greater than the buffer
-  if (receiver.rxlen >= MAX_BUF_LEN) {
+  // If our receive length just hit the limit of our buffer
+  if (receiver.state != STATE_RX_STOP && receiver.rxlen >= MAX_BUF_LEN) {
     // We have a buffer overflow
     receiver.state = STATE_RX_STOP;
+    // Notify MCU with IRQ
+    setIRQ(1);
   }
   // Switch based on the state machine
   switch(receiver.state) {
