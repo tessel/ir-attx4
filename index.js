@@ -73,7 +73,7 @@ var Infrared = function(hardware, callback) {
       // If we get a new listener
       self.on('newListener', function (event) {
         // And they are listening for rx data and we haven't been yet
-        if (event == 'data' && !this.listeners(event).length) {
+        if ((event == 'data' || event == 'message') && !this.listeners(event).length) {
           // Enable GPIO Interrupts on IRQ
           self._setListening(1);
         }
@@ -186,7 +186,10 @@ Infrared.prototype._fetchRXDurations = function (callback) {
 
             // Emit the buffer
             self.emit('data', buf);
-            self.emit('message', self._parseMessage(buf));
+            var msg = self._parseMessage(buf);
+            if (msg != null) {
+              self.emit('message', msg);
+            }
             callback && callback();
           }
         });
@@ -208,14 +211,20 @@ Infrared.prototype._parseMessage = function (buf) {
   var arr = [];
   for (var i = 0; i < buf.length; i += 2) {
     var val = buf.readInt16BE(i);
-    for (var j = 0; j < this.expected.concat([0]); j++) {
-      if (this.expected[j] == 0) {
-        val = 0;
-        break;
+    for (var j = 0; j < this.expected.length + 1; j++) {
+      if (this.expected[j] == null) {
+        return null;
       }
-      if (val > this.expected[j]*(1-this.tolerance) && val < this.expected[j]*(1+this.tolerance)) {
-        val = this.expected[j];
-        break;
+      if (val < 0) {
+        if (val < this.expected[j]*(1-this.tolerance) && val > this.expected[j]*(1+this.tolerance)) {
+          val = this.expected[j];
+          break;
+        }
+      } else {
+        if (val > this.expected[j]*(1-this.tolerance) && val < this.expected[j]*(1+this.tolerance)) {
+          val = this.expected[j];
+          break;
+        }
       }
     }
     arr.push(val);
@@ -226,7 +235,7 @@ Infrared.prototype._parseMessage = function (buf) {
 Infrared.prototype.sendSignal = function (frequency, arrsignal, callback) {
   var buf = new Buffer(arrsignal.length * 2)
   arrsignal.forEach(function (val, i) {
-    buf.push(arrsignal.writeInt16BE(val, i * 2));
+    buf.writeInt16BE(val, i * 2);
   })
   return this.sendRawSignal(frequency, buf, callback);
 }
