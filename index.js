@@ -36,6 +36,9 @@ var CRC = 47355;
 
 var Infrared = function(hardware, callback) {
 
+  this.tolerance = 0.1;
+  this.expected = [0];
+
   var self = this;
 
   // Create a new tiny agent
@@ -183,6 +186,7 @@ Infrared.prototype._fetchRXDurations = function (callback) {
 
             // Emit the buffer
             self.emit('data', buf);
+            self.emit('message', self._parseMessage(buf));
             callback && callback();
           }
         });
@@ -199,6 +203,33 @@ Infrared.prototype._fetchRXDurations = function (callback) {
     });
   });
 };
+
+Infrared.prototype._parseMessage = function (buf) {
+  var arr = [];
+  for (var i = 0; i < buf.length; i += 2) {
+    var val = buf.readInt16BE(i);
+    for (var j = 0; j < this.expected.concat([0]); j++) {
+      if (this.expected[j] == 0) {
+        val = 0;
+        break;
+      }
+      if (val > this.expected[j]*(1-this.tolerance) && val < this.expected[j]*(1+this.tolerance)) {
+        val = this.expected[j];
+        break;
+      }
+    }
+    arr.push(val);
+  }
+  return arr;
+};
+
+Infrared.prototype.sendSignal = function (frequency, arrsignal, callback) {
+  var buf = new Buffer(arrsignal.length * 2)
+  arrsignal.forEach(function (val, i) {
+    buf.push(arrsignal.writeInt16BE(val, i * 2));
+  })
+  return this.sendRawSignal(frequency, buf, callback);
+}
 
 Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callback) {
   if (frequency <= 0) {
