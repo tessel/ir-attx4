@@ -16,7 +16,7 @@
   "author": "",
   "license": "MIT/Apache 2.0",
   "dependencies": {
-    "attiny-common" : "^0.0.5",
+    "attiny-common" : "0.0.8",
     "sync-queue" : "^0.0.1"
     },
   "devDependencies": {
