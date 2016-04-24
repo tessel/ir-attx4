@@ -207,7 +207,7 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
   }
 
   if (signalDurations.length > MAX_SIGNAL_DURATION) {
-    callback && callback(new Error("Invalid buffer length. Must be between 1 and ", MAX_SIGNAL_DURATION));
+    callback && callback(new Error("Invalid buffer length. Must be between 1 and " + MAX_SIGNAL_DURATION));
     return;
   } 
 
