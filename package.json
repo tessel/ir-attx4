@@ -1,6 +1,6 @@
 {
   "name": "ir-attx4",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "The library for sending and receiving IR data from a Tessel IR Module",
   "main": "index.js",
   "repository": "github.com/tessel/ir-attx4",
@@ -16,7 +16,7 @@
   "author": "",
   "license": "MIT/Apache 2.0",
   "dependencies": {
-    "attiny-common" : "0.0.9",
+    "attiny-common" : "0.1.0",
     "sync-queue" : "^0.0.1"
     },
   "devDependencies": {
