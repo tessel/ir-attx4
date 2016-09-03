@@ -34,6 +34,8 @@ var MAX_SIGNAL_DURATION = 200;
 var FIRMWARE_VERSION = 0x04;
 var CRC = 47355;
 
+var REBOOT_TIME = 300; // Empirically observed time needed to reboot and configure registers
+
 var Infrared = function(hardware, callback) {
 
   var self = this;
@@ -51,7 +53,7 @@ var Infrared = function(hardware, callback) {
   }
 
   // Initialize (check firmware version, update as necessary)
-  this.attiny.initialize(firmwareOptions, function(err) {
+  this.attiny.initialize(REBOOT_TIME, firmwareOptions, function(err) {
 
     // If there was an error
     if (err) {
@@ -99,7 +101,7 @@ var Infrared = function(hardware, callback) {
       self._setListening(listening, function listeningSet(err) {
         // Complete the setup
         if (callback) {
-          callback(err, self); 
+          callback(err, self);
         }
       });
     }
@@ -209,7 +211,7 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
   if (signalDurations.length > MAX_SIGNAL_DURATION) {
     callback && callback(new Error("Invalid buffer length. Must be between 1 and " + MAX_SIGNAL_DURATION));
     return;
-  } 
+  }
 
   if (signalDurations.length % 2 != 0) {
     if (callback) {
@@ -233,7 +235,7 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
     if (!self.attiny._validateResponse(response, [PACKET_CONF, IR_TX_CMD, frequency, signalDurations.length/2])) {
       err = new Error("Invalid response from raw signal packet.");
     }
-    
+
     callback && callback(err);
   });
 };
@@ -241,7 +243,7 @@ Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callbac
 Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
   // Create array
   var tx = [];
-  // Add command 
+  // Add command
   tx.push(IR_TX_CMD);
   // Frequency of PWN
   tx.push(frequency);
@@ -262,8 +264,8 @@ Infrared.prototype._constructTXPacket = function (frequency, signalDurations) {
 
   return new Buffer(tx);
 };
- 
-  
+
+
 
 function use (hardware, callback) {
   return new Infrared(hardware, callback);
