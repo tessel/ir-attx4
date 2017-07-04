@@ -38,6 +38,9 @@ var REBOOT_TIME = 300; // Empirically observed time needed to reboot and configu
 
 var Infrared = function(hardware, callback) {
 
+  this.tolerance = 0.1;
+  this.expected = [0];
+
   var self = this;
 
   // Create a new tiny agent
@@ -72,7 +75,7 @@ var Infrared = function(hardware, callback) {
       // If we get a new listener
       self.on('newListener', function (event) {
         // And they are listening for rx data and we haven't been yet
-        if (event == 'data' && !this.listeners(event).length) {
+        if ((event == 'data' || event == 'message') && !this.listeners(event).length) {
           // Enable GPIO Interrupts on IRQ
           self._setListening(1);
         }
@@ -185,6 +188,10 @@ Infrared.prototype._fetchRXDurations = function (callback) {
 
             // Emit the buffer
             self.emit('data', buf);
+            var msg = self._parseMessage(buf);
+            if (msg != null) {
+              self.emit('message', msg);
+            }
             callback && callback();
           }
         });
@@ -201,6 +208,39 @@ Infrared.prototype._fetchRXDurations = function (callback) {
     });
   });
 };
+
+Infrared.prototype._parseMessage = function (buf) {
+  var arr = [];
+  for (var i = 0; i < buf.length; i += 2) {
+    var val = buf.readInt16BE(i);
+    for (var j = 0; j < this.expected.length + 1; j++) {
+      if (this.expected[j] == null) {
+        return null;
+      }
+      if (val < 0) {
+        if (val < this.expected[j]*(1-this.tolerance) && val > this.expected[j]*(1+this.tolerance)) {
+          val = this.expected[j];
+          break;
+        }
+      } else {
+        if (val > this.expected[j]*(1-this.tolerance) && val < this.expected[j]*(1+this.tolerance)) {
+          val = this.expected[j];
+          break;
+        }
+      }
+    }
+    arr.push(val);
+  }
+  return arr;
+};
+
+Infrared.prototype.sendSignal = function (frequency, arrsignal, callback) {
+  var buf = new Buffer(arrsignal.length * 2)
+  arrsignal.forEach(function (val, i) {
+    buf.writeInt16BE(val, i * 2);
+  })
+  return this.sendRawSignal(frequency, buf, callback);
+}
 
 Infrared.prototype.sendRawSignal = function (frequency, signalDurations, callback) {
   if (frequency <= 0) {
